@@ -1,5 +1,5 @@
 import { LitElement, css, html } from 'lit';
-import { createInitialState, terrains, startMatch, applyTick, playCard, canPlayCard, drawCard } from '@clan-wars/game-core';
+import { createInitialState, terrains, startMatch, applyTick, playCard, canPlayCard, drawCard, meditate, canMeditate } from '@clan-wars/game-core';
 import './ninja-battle-canvas';
 import './ninja-hand';
 import './ninja-chakra-meter';
@@ -171,11 +171,19 @@ export class NinjaClanWarsApp extends LitElement {
     this.game = drawCard(this.game);
   }
 
+  #handleMeditate(event) {
+    if (!this.game || this.game.phase !== 'battle') return;
+    const { cardId } = event.detail;
+    const now = currentTime();
+    if (!canMeditate(this.game, now)) return;
+    
+    const result = meditate(this.game, { cardId, timestamp: now });
+    if (result.success) {
+      this.game = result.state;
+    }
+  }
+
   render() {
-    const rotationCountdown = Math.max(
-      0,
-      Math.round((this.game.nextTerrainAt - currentTime()) / 1000)
-    );
     return html`
       <div class="app-shell">
         <header>
@@ -208,12 +216,13 @@ export class NinjaClanWarsApp extends LitElement {
             <ninja-hand
               .cards=${this.game.hand}
               .canPlay=${(cardId) => canPlayCard(this.game, cardId)}
+              .canMeditate=${() => canMeditate(this.game, currentTime())}
               @play-card=${(event) => this.#handlePlayCard(event)}
+              @meditate=${(event) => this.#handleMeditate(event)}
             ></ninja-hand>
           </section>
         </main>
         <footer>
-          <small>Terrain rotation in ${rotationCountdown}s</small>
           <ninja-chakra-meter
             .current=${this.game.chakra.current}
             .max=${this.game.chakra.max}

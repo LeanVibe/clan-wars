@@ -1795,3 +1795,86 @@ export function getActiveReactiveWindows() {
 export function canActivateReactiveJutsu(state) {
   return reactiveJutsuManager.hasActiveWindows() && state.phase === 'battle';
 }
+
+/**
+ * Check if player can meditate (discard 1, draw 1 with 5s cooldown)
+ */
+export function canMeditate(state, timestamp) {
+  if (state.phase !== 'battle') return false;
+  if (!state.hand?.length) return false; // Need at least 1 card to discard
+  
+  const lastMeditateAt = state.chakra?.lastMeditateAt;
+  if (!lastMeditateAt) return true; // Never meditated before
+  
+  return (timestamp - lastMeditateAt) >= MEDITATE_COOLDOWN_MS;
+}
+
+/**
+ * Meditate action: discard 1 card, draw 1 card, with 5s cooldown
+ * Provides overflow chakra penalties for strategic depth
+ */
+export function meditate(state, { cardId, timestamp }) {
+  if (!canMeditate(state, timestamp)) {
+    return { success: false, reason: 'meditate_not_available' };
+  }
+
+  // Find and discard the specified card
+  const cardIndex = state.hand.findIndex(card => card.id === cardId);
+  if (cardIndex === -1) {
+    return { success: false, reason: 'card_not_in_hand' };
+  }
+
+  const discardedCard = state.hand[cardIndex];
+  const newHand = [...state.hand];
+  newHand.splice(cardIndex, 1);
+
+  // Add to discard pile
+  const newDiscard = [...state.discard, discardedCard];
+
+  // Draw a new card
+  const drawResult = drawCard({
+    ...state,
+    hand: newHand,
+    discard: newDiscard
+  });
+
+  // Apply overflow chakra penalty: +1 chakra with potential overheat
+  const currentChakra = drawResult.chakra?.current ?? 0;
+  const maxChakra = drawResult.chakra?.max ?? MAX_CHAKRA;
+  const overflowMax = drawResult.chakra?.overflowMax ?? OVERFLOW_CHAKRA;
+  
+  let newChakra = currentChakra + 1;
+  let overheatPenalty = drawResult.chakra?.overheatPenalty ?? 0;
+  
+  // If going over normal max, apply overheat penalty
+  if (newChakra > maxChakra) {
+    overheatPenalty = Math.min(overheatPenalty + 0.1, 1.0); // Max 100% penalty
+  }
+  
+  // Cap at overflow maximum
+  newChakra = Math.min(newChakra, overflowMax);
+
+  const updatedChakra = {
+    ...drawResult.chakra,
+    current: newChakra,
+    overheatPenalty,
+    lastMeditateAt: timestamp
+  };
+
+  const finalState = {
+    ...drawResult,
+    chakra: updatedChakra,
+    stats: {
+      ...drawResult.stats,
+      actions: drawResult.stats.actions + 1
+    }
+  };
+
+  return { 
+    success: true, 
+    state: finalState,
+    discardedCard: discardedCard.name,
+    chakraGained: 1,
+    overheatPenalty: overheatPenalty > (drawResult.chakra?.overheatPenalty ?? 0)
+  };
+}

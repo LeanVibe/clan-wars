@@ -255,6 +255,77 @@ export class NinjaBattleCanvas extends LitElement {
       pointer-events: auto;
     }
 
+    .terrain-countdown {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(248, 250, 252, 0.1);
+      border-radius: var(--radius-md);
+      padding: 8px 12px;
+      pointer-events: none;
+      transition: all var(--transition-medium);
+      font-size: var(--font-size-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .terrain-countdown.urgent {
+      background: rgba(220, 38, 38, 0.25);
+      border-color: rgba(244, 63, 94, 0.4);
+      box-shadow: 0 0 12px rgba(220, 38, 38, 0.3);
+      animation: crescendo-pulse 1s ease-in-out infinite alternate;
+    }
+
+    .terrain-countdown.warning {
+      background: rgba(250, 204, 21, 0.25);
+      border-color: rgba(234, 179, 8, 0.4);
+      box-shadow: 0 0 8px rgba(250, 204, 21, 0.25);
+    }
+
+    @keyframes crescendo-pulse {
+      from {
+        box-shadow: 0 0 12px rgba(220, 38, 38, 0.3);
+        transform: scale(1);
+      }
+      to {
+        box-shadow: 0 0 20px rgba(220, 38, 38, 0.6);
+        transform: scale(1.02);
+      }
+    }
+
+    .terrain-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .terrain-name {
+      font-weight: 600;
+      color: rgba(248, 250, 252, 0.95);
+    }
+
+    .terrain-effect {
+      font-size: var(--font-size-xs);
+      color: rgba(248, 250, 252, 0.7);
+    }
+
+    .countdown-display {
+      font-weight: 700;
+      font-size: var(--font-size-lg);
+      color: rgba(248, 250, 252, 0.95);
+    }
+
+    .countdown-display.urgent {
+      color: rgba(248, 113, 113, 0.95);
+    }
+
+    .countdown-display.warning {
+      color: rgba(253, 224, 71, 0.95);
+    }
+
     button {
       pointer-events: auto;
       background: rgba(15, 23, 42, 0.7);
@@ -1004,10 +1075,46 @@ export class NinjaBattleCanvas extends LitElement {
   render() {
     const combosMap = this.#comboMap();
     const now = this.#now();
+    
+    // Calculate terrain rotation countdown and urgency
+    const rotationCountdown = Math.max(
+      0,
+      Math.round((this.state?.nextTerrainAt - now) / 1000)
+    );
+    
+    let countdownClasses = ['terrain-countdown'];
+    let countdownDisplayClasses = ['countdown-display'];
+    
+    if (rotationCountdown <= 10) {
+      countdownClasses.push('urgent');
+      countdownDisplayClasses.push('urgent');
+    } else if (rotationCountdown <= 20) {
+      countdownClasses.push('warning');
+      countdownDisplayClasses.push('warning');
+    }
+    
+    // Get current terrain info
+    const currentTerrain = this.state?.activeTerrain;
+    const terrainData = {
+      mountain: { name: 'Mountain Path', effect: 'Direct damage +1' },
+      forest: { name: 'Forest Grove', effect: 'Stealth units +1 duration' },
+      river: { name: 'River Valley', effect: 'Flow effects trigger twice' }
+    };
+    const activeTerrainInfo = terrainData[currentTerrain] || { name: 'Unknown', effect: '' };
+    
     return html`
       <div class="canvas-wrapper">
         <canvas></canvas>
         <div class="overlay">
+          <div class="${countdownClasses.join(' ')}">
+            <div class="terrain-info">
+              <div class="terrain-name">${activeTerrainInfo.name}</div>
+              <div class="terrain-effect">${activeTerrainInfo.effect}</div>
+            </div>
+            <div class="${countdownDisplayClasses.join(' ')}">
+              ${rotationCountdown}s
+            </div>
+          </div>
           <div class="lane-info">
             ${['mountain', 'forest', 'river'].map((lane) => {
               const strongholds = (this.state?.strongholds ?? []).filter((s) => s.lane === lane);
