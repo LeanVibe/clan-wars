@@ -1,0 +1,13 @@
+{
+  "name": "@clan-wars/ui-components",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "lit": "^3.1.0"
+  }
+}

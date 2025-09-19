@@ -1,0 +1,23 @@
+{
+  "name": "clan-wars",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "bun@1.1.12",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --cwd=apps/pwa run dev",
+    "build": "bun --cwd=apps/pwa run build",
+    "lint": "bun x biome lint",
+    "test": "bun x vitest",
+    "test:e2e": "bun x playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.46.0",
+    "@vitest/browser": "^1.6.0",
+    "biome": "^0.3.1",
+    "vitest": "^1.6.0"
+  }
+}

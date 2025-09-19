@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ninja Clan Wars - Competitive Card Battle</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <!-- Main Menu -->
+    <div id="mainMenu" class="screen">
+        <div class="menu-container">
+            <h1 class="game-title">Ninja Clan Wars</h1>
+            <p class="game-subtitle">Master the Art of Chakra Combat</p>
+            
+            <div class="menu-options">
+                <button id="trainingButton" class="btn btn--primary btn--lg menu-btn">Training Match</button>
+                <button id="rankedButton" class="btn btn--outline btn--lg menu-btn">Ranked Battle</button>
+                <button id="tournamentButton" class="btn btn--outline btn--lg menu-btn">Tournament</button>
+            </div>
+            
+            <div class="tournament-bracket">
+                <img src="https://ppl-ai-code-interpreter-files.s3.amazonaws.com/web/direct-files/abe56cd3d720f074931e7ebde8f9466d/effc358f-c6b8-4560-9e78-6727cd1ebfc8/65757aad.png" alt="Tournament Bracket" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen hidden">
+        <div class="game-interface">
+            <!-- Top HUD -->
+            <div class="top-hud">
+                <div class="player-status">
+                    <div class="clan-info">
+                        <span class="clan-name">Enemy Clan</span>
+                        <div class="strongholds">
+                            <div class="stronghold" id="enemyStronghold1">⛩️</div>
+                            <div class="stronghold" id="enemyStronghold2">⛩️</div>
+                            <div class="stronghold" id="enemyStronghold3">⛩️</div>
+                        </div>
+                    </div>
+                    
+                    <div class="match-info">
+                        <div class="timer" id="matchTimer">5:00</div>
+                        <div class="terrain-rotation">
+                            <span>Next Rotation:</span>
+                            <span id="terrainTimer">90s</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-panel">
+                        <div class="apm-counter">APM: <span id="apmDisplay">0</span></div>
+                        <div class="combo-counter">Combos: <span id="comboCount">0</span></div>
+                    </div>
+                </div>
+                
+                <!-- AI Hand -->
+                <div class="ai-hand">
+                    <div class="ai-card"></div>
+                    <div class="ai-card"></div>
+                    <div class="ai-card"></div>
+                    <div class="ai-card"></div>
+                    <div class="ai-card"></div>
+                </div>
+            </div>
+
+            <!-- Battlefield -->
+            <div class="battlefield-container">
+                <div class="lane-labels">
+                    <div class="lane-label mountain" id="mountainLabel">
+                        <span class="terrain-name">Mountain Path</span>
+                        <span class="terrain-bonus">Taijutsu +20%</span>
+                        <div class="terrain-indicator active"></div>
+                    </div>
+                    <div class="lane-label forest" id="forestLabel">
+                        <span class="terrain-name">Forest Grove</span>
+                        <span class="terrain-bonus">Ninjutsu +1 CP/s</span>
+                        <div class="terrain-indicator"></div>
+                    </div>
+                    <div class="lane-label river" id="riverLabel">
+                        <span class="terrain-name">River Valley</span>
+                        <span class="terrain-bonus">Genjutsu Stealth</span>
+                        <div class="terrain-indicator"></div>
+                    </div>
+                </div>
+                
+                <div id="battlefield" class="battlefield">
+                    <!-- Three.js canvas will be inserted here -->
+                </div>
+                
+                <div class="chakra-system">
+                    <div class="chakra-meter">
+                        <div class="chakra-label">Chakra Points</div>
+                        <div class="chakra-bar">
+                            <div class="chakra-fill" id="chakraFill"></div>
+                            <div class="chakra-overflow" id="chakraOverflow"></div>
+                        </div>
+                        <div class="chakra-text">
+                            <span id="currentChakra">12</span>/<span id="maxChakra">12</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Area -->
+            <div class="player-area">
+                <div class="clan-status">
+                    <div class="clan-info">
+                        <span class="clan-name">Your Clan</span>
+                        <div class="strongholds">
+                            <div class="stronghold" id="playerStronghold1">⛩️</div>
+                            <div class="stronghold" id="playerStronghold2">⛩️</div>
+                            <div class="stronghold" id="playerStronghold3">⛩️</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="playerHand" class="player-hand">
+                    <!-- Player cards will be dynamically added here -->
+                </div>
+            </div>
+
+            <!-- Combo Panel -->
+            <div class="combo-panel" id="comboPanel">
+                <h3>Available Jutsu Combos</h3>
+                <div id="availableCombos" class="combo-list">
+                    <!-- Dynamic combo options -->
+                </div>
+            </div>
+
+            <!-- Combat Feedback -->
+            <div id="combatMessage" class="combat-message hidden">
+                <span id="combatText"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="endScreen" class="screen hidden">
+        <div class="end-container">
+            <h2 id="endTitle" class="end-title">Victory!</h2>
+            <div class="match-stats" id="matchStats">
+                <div class="stat-row">
+                    <span>Final APM:</span>
+                    <span id="finalAPM">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Jutsu Combos:</span>
+                    <span id="finalCombos">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Terrain Utilization:</span>
+                    <span id="terrainUtil">0%</span>
+                </div>
+                <div class="stat-row">
+                    <span>Strongholds Destroyed:</span>
+                    <span id="strongholdsDestroyed">0</span>
+                </div>
+            </div>
+            <div class="end-buttons">
+                <button id="replayButton" class="btn btn--outline btn--lg">Watch Replay</button>
+                <button id="rematchButton" class="btn btn--primary btn--lg">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading hidden">
+        <div class="loading-spinner"></div>
+        <p>Preparing battlefield...</p>
+    </div>
+
+    <!-- Replay Controls -->
+    <div id="replayControls" class="replay-controls hidden">
+        <button id="playPause" class="btn btn--sm">⏸️</button>
+        <button id="slowMotion" class="btn btn--sm">🐌</button>
+        <button id="normalSpeed" class="btn btn--sm">▶️</button>
+        <button id="fastForward" class="btn btn--sm">⏩</button>
+        <button id="exitReplay" class="btn btn--sm">❌</button>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

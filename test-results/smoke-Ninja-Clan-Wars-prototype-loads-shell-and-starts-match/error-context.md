@@ -1,0 +1,91 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: Prototype
+      - heading "Ninja Clan Wars" [level=1] [ref=e7]
+    - button "Restart" [ref=e8]
+  - main [ref=e9]:
+    - generic [ref=e12]:
+      - generic:
+        - generic [ref=e14]:
+          - generic [ref=e15] [cursor=pointer]:
+            - generic [ref=e16] [cursor=pointer]: MOUNTAIN
+            - generic [ref=e17] [cursor=pointer]: P:0 · AI:0
+          - generic [ref=e18] [cursor=pointer]:
+            - generic [ref=e19] [cursor=pointer]: FOREST
+            - generic [ref=e20] [cursor=pointer]: P:0 · AI:0
+          - generic [ref=e21] [cursor=pointer]:
+            - generic [ref=e22] [cursor=pointer]: RIVER
+            - generic [ref=e23] [cursor=pointer]: P:0 · AI:0
+        - button "Exit Match" [ref=e25]
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]: Phase
+        - strong [ref=e29]: battle
+      - generic [ref=e30]:
+        - generic [ref=e31]: Active Terrain
+        - strong [ref=e32]: Mountain Path
+      - generic [ref=e33]:
+        - generic [ref=e34]: Selected Lane
+        - strong [ref=e35]: MOUNTAIN
+      - generic [ref=e36]:
+        - generic [ref=e37]: Chakra Overflow
+        - strong [ref=e38]: "15"
+      - generic [ref=e39]:
+        - generic [ref=e40]: Combos Drafted
+        - strong [ref=e41]: "3"
+      - generic [ref=e42]:
+        - generic [ref=e43]: Deck Remaining
+        - strong [ref=e44]: "0"
+      - generic [ref=e45]:
+        - generic [ref=e46]: Time Left
+        - strong [ref=e47]: 299s
+      - generic [ref=e48]: No cards loaded yet.
+    - generic [ref=e49]:
+      - button "Draw" [ref=e51]
+      - generic [ref=e53]:
+        - 'button "Lightning Jonin Ninjutsu Cost 8 6/4 Chain Lightning: Deal 2 damage to all enemies in lane." [ref=e54] [cursor=pointer]':
+          - generic [ref=e55] [cursor=pointer]:
+            - generic [ref=e56] [cursor=pointer]:
+              - generic [ref=e57] [cursor=pointer]: Lightning Jonin
+              - generic [ref=e58] [cursor=pointer]: Ninjutsu
+            - generic [ref=e59] [cursor=pointer]:
+              - generic [ref=e60] [cursor=pointer]: Cost 8
+              - generic [ref=e61] [cursor=pointer]: 6/4
+            - generic [ref=e62] [cursor=pointer]: "Chain Lightning: Deal 2 damage to all enemies in lane."
+        - 'button "Earth Style Chunin Ninjutsu Cost 5 3/4 Stone Wall: +2 health when on Mountain Path." [ref=e63] [cursor=pointer]':
+          - generic [ref=e64] [cursor=pointer]:
+            - generic [ref=e65] [cursor=pointer]:
+              - generic [ref=e66] [cursor=pointer]: Earth Style Chunin
+              - generic [ref=e67] [cursor=pointer]: Ninjutsu
+            - generic [ref=e68] [cursor=pointer]:
+              - generic [ref=e69] [cursor=pointer]: Cost 5
+              - generic [ref=e70] [cursor=pointer]: 3/4
+            - generic [ref=e71] [cursor=pointer]: "Stone Wall: +2 health when on Mountain Path."
+        - 'button "Medical Kunoichi Ninjutsu Cost 4 1/3 Heal: Restore 2 health to adjacent allies." [ref=e72] [cursor=pointer]':
+          - generic [ref=e73] [cursor=pointer]:
+            - generic [ref=e74] [cursor=pointer]:
+              - generic [ref=e75] [cursor=pointer]: Medical Kunoichi
+              - generic [ref=e76] [cursor=pointer]: Ninjutsu
+            - generic [ref=e77] [cursor=pointer]:
+              - generic [ref=e78] [cursor=pointer]: Cost 4
+              - generic [ref=e79] [cursor=pointer]: 1/3
+            - generic [ref=e80] [cursor=pointer]: "Heal: Restore 2 health to adjacent allies."
+        - 'button "Shadow Genin Ninjutsu Cost 2 2/2 Stealth: Cannot be targeted for 1 turn." [ref=e81] [cursor=pointer]':
+          - generic [ref=e82] [cursor=pointer]:
+            - generic [ref=e83] [cursor=pointer]:
+              - generic [ref=e84] [cursor=pointer]: Shadow Genin
+              - generic [ref=e85] [cursor=pointer]: Ninjutsu
+            - generic [ref=e86] [cursor=pointer]:
+              - generic [ref=e87] [cursor=pointer]: Cost 2
+              - generic [ref=e88] [cursor=pointer]: 2/2
+            - generic [ref=e89] [cursor=pointer]: "Stealth: Cannot be targeted for 1 turn."
+  - contentinfo [ref=e90]:
+    - generic [ref=e91]: Terrain rotation in 90s
+    - generic [ref=e92]:
+      - generic [ref=e93]: Chakra 12/12
+      - progressbar [ref=e94]
+```

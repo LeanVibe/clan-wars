@@ -1,0 +1,30 @@
+:host,
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-sans);
+  background: var(--color-background);
+  color: var(--color-text);
+  min-height: 100%;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  border: none;
+  cursor: pointer;
+}
+
+* {
+  box-sizing: border-box;
+}
