@@ -10,6 +10,7 @@ import {
   MEDITATE_COOLDOWN_MS
 } from './state.js';
 import { shuffle, createId, reshuffle } from './utils.js';
+import { effectEngine, EventTypes } from './effect-engine.js';
 
 export const HAND_LIMIT = 5;
 export const INITIAL_HAND_SIZE = 4;
@@ -260,8 +261,17 @@ export function applyTick(state, timestamp) {
   if (timestamp >= state.nextTerrainAt) {
     const ids = terrains.map((t) => t.id);
     const currentIndex = ids.indexOf(activeTerrain);
+    const previousTerrain = activeTerrain;
     activeTerrain = ids[(currentIndex + 1) % ids.length];
     nextTerrainAt = timestamp + TERRAIN_ROTATION_SECONDS * 1000;
+    
+    // Emit onTerrainChange event
+    effectEngine.emit(EventTypes.ON_TERRAIN_CHANGE, {
+      previousTerrain,
+      newTerrain: activeTerrain,
+      state: state,
+      timestamp
+    });
   }
 
   let remainingSeconds = state.clock.remainingSeconds;
@@ -286,6 +296,20 @@ export function applyTick(state, timestamp) {
   };
 
   nextState = processComboTick(nextState, timestamp);
+
+  // Emit onTick event for effect engine
+  const tickResult = effectEngine.emit(EventTypes.ON_TICK, {
+    state: nextState,
+    timestamp
+  });
+  
+  // Apply any battlefield changes from tick effects
+  if (tickResult.battlefield) {
+    nextState = {
+      ...nextState,
+      battlefield: tickResult.battlefield
+    };
+  }
 
   if (timestamp >= state.ai.nextSpawnAt) {
     nextState = spawnAiUnit(nextState, timestamp);
@@ -359,6 +383,15 @@ export function playCard(state, { cardId, lane, timestamp }) {
     }
   };
 
+  // Emit onPlay event for effect engine
+  effectEngine.emit(EventTypes.ON_PLAY, {
+    card,
+    unit,
+    lane,
+    state: nextState,
+    timestamp
+  });
+
   nextState = registerComboPlay(nextState, { card, lane, timestamp });
 
   return nextState;
@@ -402,14 +435,62 @@ export function resolveCombat(state, timestamp) {
     const aiFront = laneState.ai[0];
 
     if (playerFront && aiFront) {
-      const [playerResult, aiResult] = exchangeDamage(playerFront, aiFront);
+      // Emit onBeforeCombat events
+      const playerCombatData = effectEngine.emit(EventTypes.ON_BEFORE_COMBAT, {
+        unit: playerFront,
+        opponent: aiFront,
+        lane,
+        state: state,
+        timestamp
+      });
+      
+      const aiCombatData = effectEngine.emit(EventTypes.ON_BEFORE_COMBAT, {
+        unit: aiFront,
+        opponent: playerFront,
+        lane,
+        state: state,
+        timestamp
+      });
+
+      const [playerResult, aiResult] = exchangeDamage(
+        playerCombatData.unit || playerFront, 
+        aiCombatData.unit || aiFront,
+        playerCombatData,
+        aiCombatData
+      );
+      
+      // Emit onUnitDamaged events if damage was dealt
+      if (playerResult && playerResult.health < playerFront.health) {
+        effectEngine.emit(EventTypes.ON_UNIT_DAMAGED, {
+          unit: playerResult,
+          damage: playerFront.health - playerResult.health,
+          source: aiFront,
+          lane,
+          timestamp
+        });
+      }
+      
+      if (aiResult && aiResult.health < aiFront.health) {
+        effectEngine.emit(EventTypes.ON_UNIT_DAMAGED, {
+          unit: aiResult,
+          damage: aiFront.health - aiResult.health,
+          source: playerFront,
+          lane,
+          timestamp
+        });
+      }
+
       laneState.player = applyUnitOutcome(laneState.player, playerResult);
       laneState.ai = applyUnitOutcome(laneState.ai, aiResult);
     } else if (playerFront) {
       const targetStronghold = findStronghold(strongholds, lane, 'ai');
       const attackValue = effectiveAttack(playerFront);
       if (targetStronghold && attackValue > 0) {
-        targetStronghold.health = Math.max(targetStronghold.health - attackValue, 0);
+        // Apply structure damage mitigation to direct attacks
+        let mitigatedDamage = attackValue * STRUCTURE_DAMAGE_MULTIPLIER;
+        mitigatedDamage = Math.max(mitigatedDamage - STRUCTURE_ARMOR, 0);
+        
+        targetStronghold.health = Math.max(targetStronghold.health - mitigatedDamage, 0);
         if (targetStronghold.health === 0) {
           strongholdsDestroyed += 1;
         }
@@ -418,12 +499,29 @@ export function resolveCombat(state, timestamp) {
       const targetStronghold = findStronghold(strongholds, lane, 'player');
       const attackValue = effectiveAttack(aiFront);
       if (targetStronghold && attackValue > 0) {
-        targetStronghold.health = Math.max(targetStronghold.health - attackValue, 0);
+        // Apply structure damage mitigation to direct attacks
+        let mitigatedDamage = attackValue * STRUCTURE_DAMAGE_MULTIPLIER;
+        mitigatedDamage = Math.max(mitigatedDamage - STRUCTURE_ARMOR, 0);
+        
+        targetStronghold.health = Math.max(targetStronghold.health - mitigatedDamage, 0);
       }
     }
 
     laneState.player = laneState.player.filter((unit) => unit.health > 0);
     laneState.ai = laneState.ai.filter((unit) => unit.health > 0);
+
+    // Emit onAfterCombat event for lane
+    const afterCombatResult = effectEngine.emit(EventTypes.ON_AFTER_COMBAT, {
+      lane,
+      laneState,
+      state: state,
+      timestamp
+    });
+    
+    // Apply any healing or post-combat effects
+    if (afterCombatResult.battlefield) {
+      battlefield[lane] = afterCombatResult.battlefield[lane] || laneState;
+    }
   }
 
   return {
@@ -1020,9 +1118,33 @@ function effectiveAttack(unit) {
   return Math.max(0, Math.round(attackValue * multiplier));
 }
 
-function exchangeDamage(playerUnit, aiUnit) {
-  const playerAttack = effectiveAttack(playerUnit);
-  const aiAttack = effectiveAttack(aiUnit);
+function exchangeDamage(playerUnit, aiUnit, playerCombatData = {}, aiCombatData = {}) {
+  let playerAttack = effectiveAttack(playerUnit);
+  let aiAttack = effectiveAttack(aiUnit);
+  
+  // Apply combat modifiers from effect engine
+  if (playerCombatData.damageMultiplier) {
+    playerAttack = Math.round(playerAttack * playerCombatData.damageMultiplier);
+  }
+  if (playerCombatData.auraAttackBonus) {
+    playerAttack += playerCombatData.auraAttackBonus;
+  }
+  
+  if (aiCombatData.damageMultiplier) {
+    aiAttack = Math.round(aiAttack * aiCombatData.damageMultiplier);
+  }
+  if (aiCombatData.auraAttackBonus) {
+    aiAttack += aiCombatData.auraAttackBonus;
+  }
+  
+  // Check for stealth evasion
+  if (playerCombatData.evasionChance && Math.random() < playerCombatData.evasionChance) {
+    aiAttack = 0; // Player evades AI attack
+  }
+  if (aiCombatData.evasionChance && Math.random() < aiCombatData.evasionChance) {
+    playerAttack = 0; // AI evades player attack
+  }
+  
   return [applyDamage(playerUnit, aiAttack), applyDamage(aiUnit, playerAttack)];
 }
 
@@ -1163,13 +1285,27 @@ function applyStrongholdDamage(strongholds, lane, owner, damage) {
   const updated = strongholds.map((entry) => ({ ...entry }));
   let destroyed = 0;
   const target = updated.find((entry) => entry.lane === lane && entry.owner === owner);
-  if (target) {
+  
+  if (target && damage > 0) {
     const previous = target.health;
-    target.health = Math.max(target.health - damage, 0);
+    
+    // Apply structure damage mitigation
+    let mitigatedDamage = damage * STRUCTURE_DAMAGE_MULTIPLIER; // 50% reduction
+    mitigatedDamage = Math.max(mitigatedDamage - STRUCTURE_ARMOR, 0); // Flat armor reduction
+    
+    target.health = Math.max(target.health - mitigatedDamage, 0);
+    
+    // Track telemetry for first structure hit
+    if (previous === target.maxHealth && mitigatedDamage > 0) {
+      // This is the first damage to this stronghold
+      // Would emit telemetry event here if system was set up
+    }
+    
     if (previous > 0 && target.health === 0 && owner === 'ai') {
       destroyed = 1;
     }
   }
+  
   return { strongholds: updated, destroyed };
 }
 

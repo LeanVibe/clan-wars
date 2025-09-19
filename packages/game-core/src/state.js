@@ -6,8 +6,8 @@ export const MAX_CHAKRA = 12;
 export const OVERFLOW_CHAKRA = 15;
 export const CHAKRA_REGEN_PER_SECOND = 0.5;
 export const STRONGHOLD_BASE_HEALTH = 15;
-export const STRUCTURE_DAMAGE_MULTIPLIER = 0.5;
-export const STRUCTURE_ARMOR = 1;
+export const STRUCTURE_DAMAGE_MULTIPLIER = 0.5; // 50% damage reduction vs direct attacks
+export const STRUCTURE_ARMOR = 3; // Flat damage reduction for better protection
 export const MEDITATE_COOLDOWN_MS = 5000;
 
 export function createInitialState(now = currentTime()) {
