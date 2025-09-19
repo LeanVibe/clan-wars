@@ -11,6 +11,11 @@ import {
 } from './state.js';
 import { shuffle, createId, reshuffle } from './utils.js';
 import { effectEngine, EventTypes } from './effect-engine.js';
+import { 
+  reactiveJutsuManager, 
+  initializeReactiveJutsu, 
+  playReactiveJutsu as playReactiveJutsuHelper 
+} from './reactive-jutsu.js';
 
 export const HAND_LIMIT = 5;
 export const INITIAL_HAND_SIZE = 4;
@@ -185,7 +190,8 @@ export function startMatch(baseState, timestamp) {
   const hand = shuffledDeck.slice(0, INITIAL_HAND_SIZE);
   const deck = shuffledDeck.slice(INITIAL_HAND_SIZE);
   const activeTerrain = terrains[0]?.id ?? 'mountain';
-  return {
+  
+  const initialState = {
     ...baseState,
     phase: 'battle',
     deck,
@@ -244,6 +250,9 @@ export function startMatch(baseState, timestamp) {
     },
     comboState: defaultComboState()
   };
+
+  // Initialize reactive jutsu system
+  return initializeReactiveJutsu(initialState);
 }
 
 export function applyTick(state, timestamp) {
@@ -1740,4 +1749,49 @@ function getAiSpawnDelay(state) {
   }
   
   return baseDelay;
+}
+
+/**
+ * Play a reactive jutsu during an active combo window
+ */
+export function playReactiveJutsu(state, { windowId, jutsuId, timestamp }) {
+  if (state.phase !== 'battle') {
+    return { success: false, reason: 'not_in_battle' };
+  }
+
+  const result = playReactiveJutsuHelper(state, { windowId, jutsuId, timestamp });
+  
+  if (result.success) {
+    // Update stats
+    const nextStats = {
+      ...state.stats,
+      actions: state.stats.actions + 1,
+      comboWindows: state.stats.comboWindows + 1,
+      comboConversions: state.stats.comboConversions + 1
+    };
+
+    return {
+      ...result,
+      state: {
+        ...state,
+        stats: nextStats
+      }
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Get current reactive windows for UI display
+ */
+export function getActiveReactiveWindows() {
+  return reactiveJutsuManager.getActiveWindows();
+}
+
+/**
+ * Check if player can activate reactive jutsu
+ */
+export function canActivateReactiveJutsu(state) {
+  return reactiveJutsuManager.hasActiveWindows() && state.phase === 'battle';
 }
