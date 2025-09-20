@@ -1,14 +1,19 @@
 # Active Context
 
-**Date**: 2025-09-22
-**Owner**: Codex CLI (GPT-5)
+**Date**: 2025-09-20
+**Owner**: Claude Code (claude-sonnet-4)
 
 ## Current Focus
-- Ship a combat effects engine so keyword text (stealth, ambush, aura, heal, shield, regen) is authoritative
-- Rebalance structure damage (HP, mitigation, and multipliers) to prevent 2–3s stronghold melts
-- Introduce reactive jutsu windows (3s combo + counter) with supporting HUD updates
-- Surface terrain rotation timing/bonuses in the UI and log combat telemetry for tuning
-- Keep documentation aligned with the new combat roadmap for agent hand-offs
+Phase 4 Beta Infrastructure completion - focusing on the remaining critical components:
+- Complete PWA functionality with service worker implementation and offline capabilities
+- Set up CI/CD pipeline with GitHub Actions for automated testing and deployment
+- Finalize tournament infrastructure for competitive play
+- Enhance user onboarding system with interactive tutorials
+
+## Recently Completed
+- ✅ **Comprehensive Analytics Infrastructure**: Full privacy-first analytics system with 4 specialized modules
+- ✅ **Data Persistence System**: Complete IndexedDB wrapper with player data, rankings, and deck storage
+- ✅ **Analytics Integration**: Automatic tracking of combat events, match lifecycle, and performance metrics
 
 ## Recent Progress
 - Added Tempest Rupture & Celestial Ward combos with new rupture/ward status logic and richer battlefield telegraphy
