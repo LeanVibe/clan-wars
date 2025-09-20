@@ -1,8 +1,10 @@
 import { LitElement, css, html } from 'lit';
-import { createInitialState, terrains, startMatch, applyTick, playCard, canPlayCard, drawCard, meditate, canMeditate } from '@clan-wars/game-core';
+import { createInitialState, terrains, startMatch, applyTick, playCard, canPlayCard, drawCard, meditate, canMeditate, combatEvents } from '@clan-wars/game-core';
 import './ninja-battle-canvas';
 import './ninja-hand';
 import './ninja-chakra-meter';
+import './ninja-combat-log';
+import './ninja-lane-composition';
 import '@clan-wars/ui-components';
 
 export class NinjaClanWarsApp extends LitElement {
@@ -98,25 +100,38 @@ export class NinjaClanWarsApp extends LitElement {
 
   static properties = {
     game: { state: true },
-    selectedLane: { state: true }
+    selectedLane: { state: true },
+    combatEvents: { state: true },
+    showLaneComposition: { state: true },
+    laneCompositionLane: { state: true }
   };
 
   #raf;
+  #combatEventUnsubscribe;
 
   constructor() {
     super();
     this.game = createInitialState(currentTime());
     this.selectedLane = this.game.activeTerrain;
+    this.combatEvents = [];
+    this.showLaneComposition = false;
+    this.laneCompositionLane = '';
   }
 
   connectedCallback() {
     super.connectedCallback();
     this.#beginLoop();
+    this.#combatEventUnsubscribe = combatEvents.subscribe((event, allEvents) => {
+      this.combatEvents = [...allEvents];
+    });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this.#stopLoop();
+    if (this.#combatEventUnsubscribe) {
+      this.#combatEventUnsubscribe();
+    }
   }
 
   #beginLoop() {
@@ -144,6 +159,7 @@ export class NinjaClanWarsApp extends LitElement {
     const base = createInitialState(now);
     this.game = startMatch(base, now);
     this.selectedLane = this.game.activeTerrain;
+    combatEvents.clear();
   }
 
   #returnToMenu() {
@@ -154,6 +170,14 @@ export class NinjaClanWarsApp extends LitElement {
   #handleLaneSelected(event) {
     const { lane } = event.detail;
     this.selectedLane = lane;
+    // Show lane composition when lane is selected
+    this.laneCompositionLane = lane;
+    this.showLaneComposition = true;
+  }
+
+  #handleCloseLaneComposition() {
+    this.showLaneComposition = false;
+    this.laneCompositionLane = '';
   }
 
   #handlePlayCard(event) {
@@ -208,6 +232,10 @@ export class NinjaClanWarsApp extends LitElement {
             ${this.#renderMeta()}
           </section>
           <section class="surface">
+            <h3>Combat Events</h3>
+            <ninja-combat-log .events=${this.combatEvents}></ninja-combat-log>
+          </section>
+          <section class="surface">
             <div class="actions">
               <button class="primary" @click=${() => this.#handleDrawCard()}>
                 Draw
@@ -229,6 +257,14 @@ export class NinjaClanWarsApp extends LitElement {
             .overflow=${this.game.chakra.overflowMax}
           ></ninja-chakra-meter>
         </footer>
+        
+        <!-- Lane Composition Modal -->
+        <ninja-lane-composition
+          ?open=${this.showLaneComposition}
+          .lane=${this.laneCompositionLane}
+          .gameState=${this.game}
+          @close=${() => this.#handleCloseLaneComposition()}
+        ></ninja-lane-composition>
       </div>
     `;
   }

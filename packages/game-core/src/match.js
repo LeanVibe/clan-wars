@@ -16,6 +16,7 @@ import {
   initializeReactiveJutsu, 
   playReactiveJutsu as playReactiveJutsuHelper 
 } from './reactive-jutsu.js';
+import { combatEvents } from './combat-events.js';
 
 export const HAND_LIMIT = 5;
 export const INITIAL_HAND_SIZE = 4;
@@ -467,6 +468,25 @@ export function resolveCombat(state, timestamp) {
         playerCombatData,
         aiCombatData
       );
+      
+      // Log combat events for visibility
+      if (playerResult && playerResult.health < playerFront.health) {
+        const damage = playerFront.health - playerResult.health;
+        combatEvents.logDamage(aiFront, playerFront, damage, lane);
+        
+        if (playerResult.health <= 0) {
+          combatEvents.logDeath(playerFront, lane, aiFront);
+        }
+      }
+      
+      if (aiResult && aiResult.health < aiFront.health) {
+        const damage = aiFront.health - aiResult.health;
+        combatEvents.logDamage(playerFront, aiFront, damage, lane);
+        
+        if (aiResult.health <= 0) {
+          combatEvents.logDeath(aiFront, lane, playerFront);
+        }
+      }
       
       // Emit onUnitDamaged events if damage was dealt
       if (playerResult && playerResult.health < playerFront.health) {
