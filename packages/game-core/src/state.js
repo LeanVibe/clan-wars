@@ -119,6 +119,6 @@ export function createInitialState(now = currentTime()) {
   };
 }
 
-function currentTime() {
+export function currentTime() {
   return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
 }

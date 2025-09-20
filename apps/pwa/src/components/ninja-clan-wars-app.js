@@ -6,6 +6,8 @@ import './ninja-chakra-meter';
 import './ninja-combat-log';
 import './ninja-lane-composition';
 import './ninja-reactive-jutsu-window';
+import './ninja-ranked-queue';
+import './ninja-match-history';
 import '@clan-wars/ui-components';
 
 export class NinjaClanWarsApp extends LitElement {
@@ -97,6 +99,70 @@ export class NinjaClanWarsApp extends LitElement {
       font-size: var(--font-size-sm);
       color: var(--color-text-muted);
     }
+
+    .nav-tabs {
+      display: flex;
+      gap: var(--space-4);
+      margin-bottom: var(--space-16);
+    }
+
+    .nav-tab {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-md);
+      padding: var(--space-8) var(--space-12);
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .nav-tab:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: var(--color-text);
+    }
+
+    .nav-tab.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: var(--color-text);
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-16);
+    }
+
+    .menu-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border);
+      padding: var(--space-16);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .menu-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--color-primary);
+    }
+
+    .menu-card h3 {
+      margin: 0 0 var(--space-8) 0;
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+    }
+
+    .menu-card p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
   `;
 
   static properties = {
@@ -104,7 +170,9 @@ export class NinjaClanWarsApp extends LitElement {
     selectedLane: { state: true },
     combatEvents: { state: true },
     showLaneComposition: { state: true },
-    laneCompositionLane: { state: true }
+    laneCompositionLane: { state: true },
+    currentView: { state: true },
+    playerId: { state: true }
   };
 
   #raf;
@@ -117,6 +185,8 @@ export class NinjaClanWarsApp extends LitElement {
     this.combatEvents = [];
     this.showLaneComposition = false;
     this.laneCompositionLane = '';
+    this.currentView = 'menu'; // menu, practice, ranked, history
+    this.playerId = 'player-1'; // In a real app, this would come from auth
   }
 
   connectedCallback() {
@@ -161,11 +231,20 @@ export class NinjaClanWarsApp extends LitElement {
     this.game = startMatch(base, now);
     this.selectedLane = this.game.activeTerrain;
     combatEvents.clear();
+    this.currentView = 'practice';
   }
 
   #returnToMenu() {
     this.game = createInitialState(currentTime());
     this.selectedLane = this.game.activeTerrain;
+    this.currentView = 'menu';
+  }
+
+  #setView(view) {
+    this.currentView = view;
+    if (view === 'practice' && this.game.phase !== 'battle') {
+      this.#startMatch();
+    }
   }
 
   #handleLaneSelected(event) {
@@ -228,49 +307,28 @@ export class NinjaClanWarsApp extends LitElement {
             <span class="badge">Prototype</span>
             <h1>Ninja Clan Wars</h1>
           </div>
-          <button class="primary" @click=${() => this.#startMatch()}>
-            ${this.game.phase === 'battle' ? 'Restart' : 'Start Match'}
-          </button>
+          ${this.currentView === 'practice' ? html`
+            <button class="primary" @click=${() => this.#returnToMenu()}>
+              ← Menu
+            </button>
+          ` : ''}
         </header>
         <main>
-          <section class="surface">
-            <ninja-battle-canvas
-              .state=${this.game}
-              .selectedLane=${this.selectedLane}
-              @exit=${() => this.#returnToMenu()}
-              @lane-selected=${(event) => this.#handleLaneSelected(event)}
-            ></ninja-battle-canvas>
-          </section>
-          <section class="surface meta">
-            ${this.#renderMeta()}
-          </section>
-          <section class="surface">
-            <h3>Combat Events</h3>
-            <ninja-combat-log .events=${this.combatEvents}></ninja-combat-log>
-          </section>
-          <section class="surface">
-            <div class="actions">
-              <button class="primary" @click=${() => this.#handleDrawCard()}>
-                Draw
-              </button>
-            </div>
-            <ninja-hand
-              .cards=${this.game.hand}
-              .canPlay=${(cardId) => canPlayCard(this.game, cardId)}
-              .canMeditate=${() => canMeditate(this.game, currentTime())}
-              @play-card=${(event) => this.#handlePlayCard(event)}
-              @meditate=${(event) => this.#handleMeditate(event)}
-            ></ninja-hand>
-          </section>
+          ${this.currentView === 'menu' ? this.#renderMenu() : ''}
+          ${this.currentView === 'practice' ? this.#renderGame() : ''}
+          ${this.currentView === 'ranked' ? this.#renderRanked() : ''}
+          ${this.currentView === 'history' ? this.#renderHistory() : ''}
         </main>
-        <footer>
-          <ninja-chakra-meter
-            .current=${this.game.chakra.current}
-            .max=${this.game.chakra.max}
-            .overflow=${this.game.chakra.overflowMax}
-            .overheatPenalty=${this.game.chakra.overheatPenalty ?? 0}
-          ></ninja-chakra-meter>
-        </footer>
+        ${this.currentView === 'practice' ? html`
+          <footer>
+            <ninja-chakra-meter
+              .current=${this.game.chakra.current}
+              .max=${this.game.chakra.max}
+              .overflow=${this.game.chakra.overflowMax}
+              .overheatPenalty=${this.game.chakra.overheatPenalty ?? 0}
+            ></ninja-chakra-meter>
+          </footer>
+        ` : ''}
         
         <!-- Lane Composition Modal -->
         <ninja-lane-composition
@@ -288,6 +346,166 @@ export class NinjaClanWarsApp extends LitElement {
         ></ninja-reactive-jutsu-window>
       </div>
     `;
+  }
+
+  #renderMenu() {
+    return html`
+      <section class="surface">
+        <div class="nav-tabs">
+          <button 
+            class="nav-tab ${this.currentView === 'menu' ? 'active' : ''}"
+            @click=${() => this.#setView('menu')}
+          >
+            🏠 Main Menu
+          </button>
+          <button 
+            class="nav-tab"
+            @click=${() => this.#setView('ranked')}
+          >
+            🏆 Ranked
+          </button>
+          <button 
+            class="nav-tab"
+            @click=${() => this.#setView('history')}
+          >
+            📊 History
+          </button>
+        </div>
+
+        <div class="menu-grid">
+          <div class="menu-card" @click=${() => this.#setView('practice')}>
+            <h3>🥷 Practice Mode</h3>
+            <p>Train your ninja skills against AI opponents. Perfect your combos and master terrain strategies.</p>
+          </div>
+          
+          <div class="menu-card" @click=${() => this.#setView('ranked')}>
+            <h3>🏆 Ranked Queue</h3>
+            <p>Test your abilities in competitive matches. Climb the ninja ranks and prove your mastery.</p>
+          </div>
+          
+          <div class="menu-card" @click=${() => this.#setView('history')}>
+            <h3>📊 Match History</h3>
+            <p>Review your past battles, analyze your performance, and track your progression.</p>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  #renderGame() {
+    return html`
+      <section class="surface">
+        <ninja-battle-canvas
+          .state=${this.game}
+          .selectedLane=${this.selectedLane}
+          @exit=${() => this.#returnToMenu()}
+          @lane-selected=${(event) => this.#handleLaneSelected(event)}
+        ></ninja-battle-canvas>
+      </section>
+      <section class="surface meta">
+        ${this.#renderMeta()}
+      </section>
+      <section class="surface">
+        <h3>Combat Events</h3>
+        <ninja-combat-log .events=${this.combatEvents}></ninja-combat-log>
+      </section>
+      <section class="surface">
+        <div class="actions">
+          <button class="primary" @click=${() => this.#handleDrawCard()}>
+            Draw
+          </button>
+        </div>
+        <ninja-hand
+          .cards=${this.game.hand}
+          .canPlay=${(cardId) => canPlayCard(this.game, cardId)}
+          .canMeditate=${() => canMeditate(this.game, currentTime())}
+          @play-card=${(event) => this.#handlePlayCard(event)}
+          @meditate=${(event) => this.#handleMeditate(event)}
+        ></ninja-hand>
+      </section>
+    `;
+  }
+
+  #renderRanked() {
+    return html`
+      <section class="surface">
+        <div class="nav-tabs">
+          <button 
+            class="nav-tab"
+            @click=${() => this.#setView('menu')}
+          >
+            🏠 Main Menu
+          </button>
+          <button 
+            class="nav-tab ${this.currentView === 'ranked' ? 'active' : ''}"
+            @click=${() => this.#setView('ranked')}
+          >
+            🏆 Ranked
+          </button>
+          <button 
+            class="nav-tab"
+            @click=${() => this.#setView('history')}
+          >
+            📊 History
+          </button>
+        </div>
+
+        <ninja-ranked-queue
+          .playerId=${this.playerId}
+          @queue-joined=${(event) => this.#handleQueueJoined(event)}
+          @queue-left=${(event) => this.#handleQueueLeft(event)}
+          @match-accepted=${(event) => this.#handleMatchAccepted(event)}
+          @match-declined=${(event) => this.#handleMatchDeclined(event)}
+        ></ninja-ranked-queue>
+      </section>
+    `;
+  }
+
+  #renderHistory() {
+    return html`
+      <section class="surface">
+        <div class="nav-tabs">
+          <button 
+            class="nav-tab"
+            @click=${() => this.#setView('menu')}
+          >
+            🏠 Main Menu
+          </button>
+          <button 
+            class="nav-tab"
+            @click=${() => this.#setView('ranked')}
+          >
+            🏆 Ranked
+          </button>
+          <button 
+            class="nav-tab ${this.currentView === 'history' ? 'active' : ''}"
+            @click=${() => this.#setView('history')}
+          >
+            📊 History
+          </button>
+        </div>
+
+        <ninja-match-history .playerId=${this.playerId}></ninja-match-history>
+      </section>
+    `;
+  }
+
+  #handleQueueJoined(event) {
+    console.log('Player joined queue:', event.detail);
+  }
+
+  #handleQueueLeft(event) {
+    console.log('Player left queue:', event.detail);
+  }
+
+  #handleMatchAccepted(event) {
+    console.log('Match accepted:', event.detail);
+    // In a real implementation, this would start the ranked match
+    this.#setView('practice'); // For now, go to practice mode
+  }
+
+  #handleMatchDeclined(event) {
+    console.log('Match declined:', event.detail);
   }
 
   #renderMeta() {
