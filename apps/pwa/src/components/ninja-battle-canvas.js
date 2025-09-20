@@ -17,6 +17,20 @@ export class NinjaBattleCanvas extends LitElement {
       background: radial-gradient(circle at top, rgba(30, 154, 176, 0.25), rgba(15, 23, 42, 0.9));
     }
 
+    /* Mobile responsive canvas */
+    @media (max-width: 768px) {
+      .canvas-wrapper {
+        aspect-ratio: 4 / 5; /* Slightly taller on mobile for better lane visibility */
+        border-radius: var(--radius-md);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .canvas-wrapper {
+        aspect-ratio: 9 / 10; /* More square aspect ratio on small phones */
+      }
+    }
+
     canvas {
       width: 100%;
       height: 100%;
@@ -51,6 +65,47 @@ export class NinjaBattleCanvas extends LitElement {
       transition: background var(--transition-medium), transform var(--transition-medium);
       pointer-events: auto;
       cursor: pointer;
+      /* Mobile-friendly touch targets */
+      min-height: 44px;
+      touch-action: manipulation;
+      position: relative;
+    }
+
+    /* Enhanced mobile touch states */
+    @media (hover: none) and (pointer: coarse) {
+      .lane {
+        min-height: 52px; /* Larger touch targets on touch devices */
+        padding: 8px 12px;
+      }
+      
+      .lane:active {
+        transform: scale(0.98);
+        background: rgba(30, 154, 176, 0.6);
+        transition: all 0.1s ease-out;
+      }
+    }
+
+    /* Touch ripple effect for lanes */
+    .lane::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(30, 154, 176, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease-out, height 0.3s ease-out;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .lane:active::after {
+      width: 100%;
+      height: 100%;
+      opacity: 1;
+      transition: width 0.1s ease-out, height 0.1s ease-out, opacity 0.1s ease-out;
     }
 
     .lane.active {
@@ -273,6 +328,33 @@ export class NinjaBattleCanvas extends LitElement {
       align-items: center;
     }
 
+    /* Mobile optimized terrain countdown */
+    @media (max-width: 768px) {
+      .terrain-countdown {
+        font-size: var(--font-size-base);
+        padding: 10px 16px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .terrain-countdown {
+        font-size: var(--font-size-lg);
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 4px;
+        text-align: center;
+      }
+      
+      .terrain-info {
+        order: 2;
+      }
+      
+      .countdown-display {
+        order: 1;
+        font-size: var(--font-size-xl) !important;
+      }
+    }
+
     .terrain-countdown.urgent {
       background: rgba(220, 38, 38, 0.25);
       border-color: rgba(244, 63, 94, 0.4);
@@ -335,6 +417,36 @@ export class NinjaBattleCanvas extends LitElement {
       padding: 6px 12px;
       border-radius: var(--radius-pill);
       font-size: var(--font-size-xs);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      /* Mobile-friendly touch targets */
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background: rgba(15, 23, 42, 0.9);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+      background: rgba(30, 154, 176, 0.7);
+    }
+
+    /* Enhanced mobile button styling */
+    @media (hover: none) and (pointer: coarse) {
+      button {
+        min-height: 48px;
+        padding: 8px 16px;
+        font-size: var(--font-size-sm);
+      }
+      
+      button:active {
+        transform: scale(0.95);
+        background: rgba(30, 154, 176, 0.8);
+        transition: all 0.1s ease-out;
+      }
     }
 
     /* Damage Floaters */
@@ -737,6 +849,9 @@ export class NinjaBattleCanvas extends LitElement {
   }
 
   #selectLane(lane) {
+    // Haptic feedback for lane selection
+    this.#triggerHapticFeedback('light');
+    
     this.selectedLane = lane;
     this.dispatchEvent(
       new CustomEvent('lane-selected', {
@@ -745,6 +860,28 @@ export class NinjaBattleCanvas extends LitElement {
         composed: true
       })
     );
+  }
+
+  #triggerHapticFeedback(intensity = 'light') {
+    // Check if vibration API is supported
+    if (!navigator.vibrate) return;
+
+    // Define vibration patterns for different intensities
+    const patterns = {
+      light: 10,      // Brief tap for lane selection
+      medium: [50],   // Single vibration for important actions
+      heavy: [100, 50, 100], // Pattern for combat events
+      combo: [30, 20, 50, 20, 70], // Special pattern for combo execution
+    };
+
+    const pattern = patterns[intensity] || patterns.light;
+    
+    try {
+      navigator.vibrate(pattern);
+    } catch (error) {
+      // Silently fail if vibration is not available or permission denied
+      console.debug('Haptic feedback unavailable:', error.message);
+    }
   }
 
   #syncLaneCombos(now) {

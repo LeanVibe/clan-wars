@@ -27,6 +27,14 @@ export class NinjaClanWarsApp extends LitElement {
       backdrop-filter: blur(18px);
     }
 
+    /* Mobile responsive app shell */
+    @media (max-width: 768px) {
+      .app-shell {
+        width: 100%;
+        min-height: 100vh;
+      }
+    }
+
     header,
     footer {
       display: flex;
@@ -41,6 +49,34 @@ export class NinjaClanWarsApp extends LitElement {
       padding: var(--space-12);
       display: grid;
       gap: var(--space-12);
+    }
+
+    /* Mobile responsive layout */
+    @media (max-width: 768px) {
+      header,
+      footer {
+        padding: var(--space-8) var(--space-12);
+        gap: var(--space-8);
+      }
+
+      main {
+        padding: var(--space-8) var(--space-12);
+        gap: var(--space-8);
+      }
+    }
+
+    @media (max-width: 480px) {
+      header,
+      footer {
+        padding: var(--space-6) var(--space-8);
+        gap: var(--space-6);
+        flex-wrap: wrap;
+      }
+
+      main {
+        padding: var(--space-6) var(--space-8);
+        gap: var(--space-6);
+      }
     }
 
     .surface {
@@ -66,11 +102,29 @@ export class NinjaClanWarsApp extends LitElement {
       font-weight: 600;
       letter-spacing: 0.04em;
       transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+      /* Mobile-friendly touch targets */
+      min-height: 44px;
+      touch-action: manipulation;
+      cursor: pointer;
     }
 
     button.primary:hover {
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
+    }
+
+    /* Enhanced mobile button styling */
+    @media (hover: none) and (pointer: coarse) {
+      button.primary {
+        min-height: 48px;
+        padding: var(--space-12) var(--space-20);
+        font-size: var(--font-size-base);
+      }
+      
+      button.primary:active {
+        transform: scale(0.95);
+        transition: all 0.1s ease-out;
+      }
     }
 
     footer ninja-chakra-meter {
@@ -116,6 +170,12 @@ export class NinjaClanWarsApp extends LitElement {
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
+      /* Mobile-friendly touch targets */
+      min-height: 44px;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .nav-tab:hover {
@@ -127,6 +187,21 @@ export class NinjaClanWarsApp extends LitElement {
       background: var(--color-primary);
       border-color: var(--color-primary);
       color: var(--color-text);
+    }
+
+    /* Enhanced mobile nav tab styling */
+    @media (hover: none) and (pointer: coarse) {
+      .nav-tab {
+        min-height: 48px;
+        padding: var(--space-12) var(--space-16);
+        font-size: var(--font-size-base);
+        flex: 1; /* Equal width tabs on mobile */
+      }
+      
+      .nav-tab:active {
+        transform: scale(0.95);
+        transition: all 0.1s ease-out;
+      }
     }
 
     .menu-grid {
@@ -143,12 +218,45 @@ export class NinjaClanWarsApp extends LitElement {
       text-align: center;
       cursor: pointer;
       transition: all 0.2s ease;
+      /* Mobile-friendly touch targets */
+      min-height: 120px;
+      touch-action: manipulation;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
     }
 
     .menu-card:hover {
       transform: translateY(-4px);
       box-shadow: var(--shadow-lg);
       border-color: var(--color-primary);
+    }
+
+    /* Enhanced mobile menu card styling */
+    @media (max-width: 768px) {
+      .menu-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-12);
+      }
+      
+      .menu-card {
+        min-height: 100px;
+        padding: var(--space-20);
+      }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .menu-card {
+        min-height: 140px;
+        padding: var(--space-20);
+      }
+      
+      .menu-card:active {
+        transform: scale(0.98);
+        background: var(--color-surface-muted);
+        transition: all 0.1s ease-out;
+      }
     }
 
     .menu-card h3 {

@@ -9,8 +9,26 @@ export class NinjaHand extends LitElement {
 
     .hand-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: var(--space-12);
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: var(--space-16);
+      padding: var(--space-8);
+    }
+
+    /* Mobile-first responsive card sizing */
+    @media (max-width: 768px) {
+      .hand-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: var(--space-20);
+        padding: var(--space-12);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hand-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: var(--space-24);
+        padding: var(--space-16);
+      }
     }
 
     button.card {
@@ -18,20 +36,60 @@ export class NinjaHand extends LitElement {
       cursor: pointer;
       display: block;
       transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+      border-radius: var(--radius-lg);
+      /* Improved touch target */
+      min-height: 44px; /* iOS recommended minimum */
+      position: relative;
+      overflow: hidden;
     }
 
     button.card:focus-visible {
-      outline: 2px solid var(--color-primary);
+      outline: 3px solid var(--color-primary);
+      outline-offset: 2px;
     }
 
-    button.card.playable:hover {
+    /* Enhanced mobile touch feedback */
+    button.card.playable:hover,
+    button.card.playable:active {
       transform: translateY(-4px);
       box-shadow: var(--shadow-md);
+    }
+
+    /* Mobile touch states */
+    @media (hover: none) and (pointer: coarse) {
+      button.card.playable:active {
+        transform: scale(0.98) translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        transition: transform 0.1s ease-out;
+      }
     }
 
     button.card.unplayable {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+
+    /* Touch ripple effect */
+    button.card::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease-out, height 0.3s ease-out;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    button.card.playable:active::after {
+      width: 100%;
+      height: 100%;
+      opacity: 1;
+      transition: width 0.1s ease-out, height 0.1s ease-out, opacity 0.1s ease-out;
     }
 
     .meditate-controls {
@@ -107,11 +165,17 @@ export class NinjaHand extends LitElement {
   }
 
   #play(cardId) {
+    // Haptic feedback for mobile devices
+    this.#triggerHapticFeedback('light');
+
     if (this.meditateMode) {
       this.selectedCardId = this.selectedCardId === cardId ? null : cardId;
       this.requestUpdate();
       return;
     }
+
+    // Stronger haptic feedback for actual card play
+    this.#triggerHapticFeedback('medium');
 
     this.dispatchEvent(
       new CustomEvent('play-card', {
@@ -123,12 +187,14 @@ export class NinjaHand extends LitElement {
   }
 
   #startMeditate() {
+    this.#triggerHapticFeedback('light');
     this.meditateMode = true;
     this.selectedCardId = null;
     this.requestUpdate();
   }
 
   #cancelMeditate() {
+    this.#triggerHapticFeedback('light');
     this.meditateMode = false;
     this.selectedCardId = null;
     this.requestUpdate();
@@ -136,6 +202,9 @@ export class NinjaHand extends LitElement {
 
   #confirmMeditate() {
     if (!this.selectedCardId) return;
+
+    // Success haptic feedback for meditation
+    this.#triggerHapticFeedback('success');
 
     this.dispatchEvent(
       new CustomEvent('meditate', {
@@ -148,6 +217,29 @@ export class NinjaHand extends LitElement {
     this.meditateMode = false;
     this.selectedCardId = null;
     this.requestUpdate();
+  }
+
+  #triggerHapticFeedback(intensity = 'light') {
+    // Check if vibration API is supported
+    if (!navigator.vibrate) return;
+
+    // Define vibration patterns for different intensities
+    const patterns = {
+      light: 10,      // Brief tap for selection/hover
+      medium: [50],   // Single vibration for card play
+      heavy: [100, 50, 100], // Pattern for special actions like combos
+      success: [30, 20, 30, 20, 30], // Success pattern for meditation
+      error: [200, 100, 200] // Error pattern for invalid plays
+    };
+
+    const pattern = patterns[intensity] || patterns.light;
+    
+    try {
+      navigator.vibrate(pattern);
+    } catch (error) {
+      // Silently fail if vibration is not available or permission denied
+      console.debug('Haptic feedback unavailable:', error.message);
+    }
   }
 
   render() {
