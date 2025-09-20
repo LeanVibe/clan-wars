@@ -6,3 +6,6 @@ export * from './replay';
 export * from './effect-engine';
 export * from './reactive-jutsu';
 export * from './combat-events';
+export * from './ranking';
+export * from './persistence';
+export * from './game-persistence-bridge';

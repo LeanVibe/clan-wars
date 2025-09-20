@@ -22,6 +22,8 @@ export class RankingSystem {
     this.playerRatings = new Map(); // playerId -> PlayerRating
     this.matchHistory = new Map(); // playerId -> MatchRecord[]
     this.currentSeason = this.createSeason('season-1', 'Ninja Academy', Date.now());
+    this.eventListeners = new Map(); // event -> listener[]
+    this.persistenceEnabled = false;
   }
 
   /**
@@ -114,7 +116,7 @@ export class RankingSystem {
       timestamp: Date.now()
     });
 
-    return {
+    const result = {
       playerId,
       oldRating,
       newRating,
@@ -125,6 +127,14 @@ export class RankingSystem {
       isPlacement,
       placementMatchesRemaining: Math.max(0, PLACEMENT_MATCHES - playerRating.placementMatches)
     };
+
+    // Emit events for persistence system
+    this._emit('ratingUpdated', result);
+    if (result.rankChanged) {
+      this._emit('rankChanged', { playerId, oldRank, newRank });
+    }
+
+    return result;
   }
 
   /**
@@ -304,6 +314,81 @@ export class RankingSystem {
     if (data.currentSeasonId && this.seasons.has(data.currentSeasonId)) {
       this.currentSeason = this.seasons.get(data.currentSeasonId);
     }
+    
+    this._emit('dataImported', { recordCount: Object.keys(data).length });
+  }
+
+  /**
+   * Add event listener for ranking system events
+   * @param {string} event - Event name
+   * @param {Function} listener - Event listener function
+   */
+  addEventListener(event, listener) {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, []);
+    }
+    this.eventListeners.get(event).push(listener);
+  }
+
+  /**
+   * Remove event listener
+   * @param {string} event - Event name
+   * @param {Function} listener - Event listener function
+   */
+  removeEventListener(event, listener) {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      const index = listeners.indexOf(listener);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to listeners
+   * @param {string} event - Event name
+   * @param {Object} data - Event data
+   */
+  _emit(event, data) {
+    const listeners = this.eventListeners.get(event) || [];
+    for (const listener of listeners) {
+      try {
+        listener(data);
+      } catch (error) {
+        console.error(`[RankingSystem] Error in event listener for ${event}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Enable persistence integration
+   * @param {PersistenceManager} persistenceManager - Persistence manager instance
+   */
+  enablePersistence(persistenceManager) {
+    if (this.persistenceEnabled) return;
+
+    this.persistenceEnabled = true;
+    let saveTimeout = null;
+    
+    const debouncedSave = () => {
+      if (saveTimeout) clearTimeout(saveTimeout);
+      
+      saveTimeout = setTimeout(async () => {
+        try {
+          const data = this.exportData();
+          await persistenceManager.saveRankingData(data);
+        } catch (error) {
+          console.error('[RankingSystem] Auto-save failed:', error);
+        }
+      }, 2000); // Save 2 seconds after last change
+    };
+
+    // Listen to ranking changes and auto-save
+    this.addEventListener('ratingUpdated', debouncedSave);
+    this.addEventListener('rankChanged', debouncedSave);
+    
+    console.log('[RankingSystem] Persistence enabled');
   }
 }
 
