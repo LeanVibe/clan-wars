@@ -20,6 +20,34 @@ export const terrains = [
 ];
 
 export const starterDeck = [
+  // === AGGRO ARCHETYPE CARDS ===
+  {
+    id: 'academy-student',
+    name: 'Academy Student',
+    school: 'Taijutsu',
+    cost: 1,
+    attack: 1,
+    health: 1,
+    rarity: 'common',
+    ability: 'Rush: Can attack immediately.',
+    archetype: 'aggro',
+    keywords: [
+      {
+        type: 'rush'
+      }
+    ]
+  },
+  {
+    id: 'kunai-thrower',
+    name: 'Kunai Thrower',
+    school: 'Taijutsu',
+    cost: 1,
+    attack: 2,
+    health: 1,
+    rarity: 'common',
+    ability: 'Fragile but fast.',
+    archetype: 'aggro'
+  },
   {
     id: 'shadow-genin',
     name: 'Shadow Genin',
@@ -29,12 +57,117 @@ export const starterDeck = [
     health: 2,
     rarity: 'common',
     ability: 'Stealth (3s).',
+    archetype: 'aggro',
     keywords: [
       {
         type: 'stealth',
         durationMs: 3000
       }
     ]
+  },
+  {
+    id: 'swift-striker',
+    name: 'Swift Striker',
+    school: 'Taijutsu',
+    cost: 2,
+    attack: 3,
+    health: 1,
+    rarity: 'common',
+    ability: 'Rush.',
+    archetype: 'aggro',
+    keywords: [
+      {
+        type: 'rush'
+      }
+    ]
+  },
+  {
+    id: 'blood-frenzy-ninja',
+    name: 'Blood Frenzy Ninja',
+    school: 'Genjutsu',
+    cost: 2,
+    attack: 1,
+    health: 2,
+    rarity: 'uncommon',
+    ability: 'Gains +1 attack for each enemy killed this match.',
+    archetype: 'aggro',
+    keywords: [
+      {
+        type: 'growth',
+        trigger: 'enemy-death',
+        attackBonus: 1
+      }
+    ]
+  },
+  {
+    id: 'flame-dash-warrior',
+    name: 'Flame Dash Warrior',
+    school: 'Taijutsu',
+    cost: 3,
+    attack: 4,
+    health: 1,
+    rarity: 'uncommon',
+    ability: 'Rush. Dies at end of turn.',
+    archetype: 'aggro',
+    keywords: [
+      {
+        type: 'rush'
+      },
+      {
+        type: 'temporary',
+        expiresEndOfTurn: true
+      }
+    ]
+  },
+  {
+    id: 'explosive-shuriken',
+    name: 'Explosive Shuriken',
+    school: 'Ninjutsu',
+    cost: 3,
+    attack: 0,
+    health: 1,
+    rarity: 'rare',
+    ability: 'On death: Deal 3 damage to all enemies in lane.',
+    archetype: 'aggro',
+    onDeath: {
+      type: 'damage-lane',
+      target: 'ai',
+      damage: 3
+    }
+  },
+
+  // === CONTROL ARCHETYPE CARDS ===
+  {
+    id: 'healing-spring',
+    name: 'Healing Spring',
+    school: 'Ninjutsu',
+    cost: 1,
+    attack: 0,
+    health: 3,
+    rarity: 'common',
+    ability: 'At end of turn: Heal all allies 1.',
+    archetype: 'control',
+    keywords: [
+      {
+        type: 'heal-all-end-turn',
+        value: 1
+      }
+    ]
+  },
+  {
+    id: 'chakra-siphon',
+    name: 'Chakra Siphon',
+    school: 'Genjutsu',
+    cost: 2,
+    attack: 1,
+    health: 2,
+    rarity: 'common',
+    ability: 'Draw a card when played.',
+    archetype: 'control',
+    onPlay: {
+      type: 'draw-card',
+      count: 1
+    }
   },
   {
     id: 'forest-scout',
@@ -45,6 +178,7 @@ export const starterDeck = [
     health: 3,
     rarity: 'common',
     ability: 'Regenerate 1 health per tick.',
+    archetype: 'control',
     keywords: [
       {
         type: 'regen',
@@ -52,6 +186,41 @@ export const starterDeck = [
         tickIntervalMs: 1000
       }
     ]
+  },
+  {
+    id: 'void-barrier',
+    name: 'Void Barrier',
+    school: 'Genjutsu',
+    cost: 3,
+    attack: 0,
+    health: 5,
+    rarity: 'uncommon',
+    ability: 'Taunt. Cannot attack.',
+    archetype: 'control',
+    keywords: [
+      {
+        type: 'taunt'
+      },
+      {
+        type: 'cannot-attack'
+      }
+    ]
+  },
+  {
+    id: 'storm-barrier',
+    name: 'Storm Barrier',
+    school: 'Ninjutsu',
+    cost: 4,
+    attack: 0,
+    health: 1,
+    rarity: 'rare',
+    ability: 'On play: Deal 2 damage to all enemies.',
+    archetype: 'control',
+    onPlay: {
+      type: 'damage-all',
+      target: 'ai',
+      damage: 2
+    }
   },
   {
     id: 'chakra-monk',
@@ -62,6 +231,7 @@ export const starterDeck = [
     health: 2,
     rarity: 'common',
     ability: 'Shield 1.',
+    archetype: 'control',
     keywords: [
       {
         type: 'shield',
@@ -78,6 +248,7 @@ export const starterDeck = [
     health: 2,
     rarity: 'uncommon',
     ability: 'Ambush: first strike deals double damage (triples on River).',
+    archetype: 'aggro',
     keywords: [
       {
         type: 'ambush',
@@ -96,6 +267,7 @@ export const starterDeck = [
     health: 3,
     rarity: 'uncommon',
     ability: 'Heal adjacent allies 2 after combat.',
+    archetype: 'control',
     keywords: [
       {
         type: 'heal-adjacent',
@@ -103,6 +275,93 @@ export const starterDeck = [
       }
     ]
   },
+  {
+    id: 'mind-reader',
+    name: 'Mind Reader',
+    school: 'Genjutsu',
+    cost: 4,
+    attack: 2,
+    health: 4,
+    rarity: 'rare',
+    ability: 'On play: Draw 2 cards.',
+    archetype: 'control',
+    onPlay: {
+      type: 'draw-card',
+      count: 2
+    }
+  },
+  // === COMBO ARCHETYPE CARDS ===
+  {
+    id: 'scroll-keeper',
+    name: 'Scroll Keeper',
+    school: 'Ninjutsu',
+    cost: 2,
+    attack: 1,
+    health: 3,
+    rarity: 'common',
+    ability: 'When you play a combo: Draw a card.',
+    archetype: 'combo',
+    keywords: [
+      {
+        type: 'combo-trigger',
+        effect: 'draw-card'
+      }
+    ]
+  },
+  {
+    id: 'jutsu-weaver',
+    name: 'Jutsu Weaver',
+    school: 'Genjutsu',
+    cost: 3,
+    attack: 2,
+    health: 2,
+    rarity: 'uncommon',
+    ability: 'Reduce combo costs by 1.',
+    archetype: 'combo',
+    keywords: [
+      {
+        type: 'combo-cost-reduction',
+        value: 1
+      }
+    ]
+  },
+  {
+    id: 'elemental-conduit',
+    name: 'Elemental Conduit',
+    school: 'Taijutsu',
+    cost: 4,
+    attack: 2,
+    health: 5,
+    rarity: 'rare',
+    ability: 'Your combos deal +2 damage.',
+    archetype: 'combo',
+    keywords: [
+      {
+        type: 'combo-amplifier',
+        damageBonus: 2
+      }
+    ]
+  },
+  {
+    id: 'sequence-master',
+    name: 'Sequence Master',
+    school: 'Ninjutsu',
+    cost: 5,
+    attack: 3,
+    health: 3,
+    rarity: 'rare',
+    ability: 'When you complete a 3+ card combo: Summon a 3/3 clone.',
+    archetype: 'combo',
+    keywords: [
+      {
+        type: 'combo-payoff',
+        minLength: 3,
+        summon: { attack: 3, health: 3 }
+      }
+    ]
+  },
+
+  // === CONTROL LATE GAME ===
   {
     id: 'earth-style-chunin',
     name: 'Earth Style Chunin',
@@ -112,6 +371,7 @@ export const starterDeck = [
     health: 4,
     rarity: 'uncommon',
     ability: 'Stoneguard: Shield 2.',
+    archetype: 'control',
     keywords: [
       {
         type: 'shield',
@@ -119,6 +379,44 @@ export const starterDeck = [
       }
     ]
   },
+  {
+    id: 'chakra-well',
+    name: 'Chakra Well',
+    school: 'Ninjutsu',
+    cost: 5,
+    attack: 0,
+    health: 8,
+    rarity: 'rare',
+    ability: 'Cannot attack. Gain +2 chakra per turn.',
+    archetype: 'control',
+    keywords: [
+      {
+        type: 'cannot-attack'
+      },
+      {
+        type: 'chakra-generation',
+        value: 2
+      }
+    ]
+  },
+  {
+    id: 'frost-archon',
+    name: 'Frost Archon',
+    school: 'Genjutsu',
+    cost: 6,
+    attack: 2,
+    health: 7,
+    rarity: 'rare',
+    ability: 'On play: Freeze all enemies for 3 seconds.',
+    archetype: 'control',
+    onPlay: {
+      type: 'freeze-all',
+      target: 'ai',
+      durationMs: 3000
+    }
+  },
+
+  // === COMBO SYNERGY CARDS ===
   {
     id: 'ember-adept',
     name: 'Ember Adept',
@@ -128,6 +426,7 @@ export const starterDeck = [
     health: 4,
     rarity: 'uncommon',
     ability: 'Aura: allies in lane gain +1 attack while Ember Adept survives.',
+    archetype: 'combo',
     keywords: [
       {
         type: 'aura',
@@ -144,6 +443,7 @@ export const starterDeck = [
     health: 5,
     rarity: 'rare',
     ability: 'Veil Aura: enemies in lane suffer -1 attack.',
+    archetype: 'control',
     keywords: [
       {
         type: 'aura',
@@ -152,6 +452,8 @@ export const starterDeck = [
       }
     ]
   },
+
+  // === HIGH-COST FINISHERS ===
   {
     id: 'forest-guardian',
     name: 'Forest Guardian',
@@ -161,6 +463,7 @@ export const starterDeck = [
     health: 6,
     rarity: 'rare',
     ability: 'Regenerate 2 per tick.',
+    archetype: 'control',
     keywords: [
       {
         type: 'regen',
@@ -178,10 +481,138 @@ export const starterDeck = [
     health: 4,
     rarity: 'rare',
     ability: 'Chain Lightning: on play deal 2 damage to all enemies in lane.',
+    archetype: 'combo',
     onPlay: {
       type: 'damage-lane',
       target: 'ai',
       damage: 2
+    }
+  },
+
+  // === ADDITIONAL AGGRO CARDS ===
+  {
+    id: 'berserker-raider',
+    name: 'Berserker Raider',
+    school: 'Taijutsu',
+    cost: 4,
+    attack: 5,
+    health: 2,
+    rarity: 'uncommon',
+    ability: 'Rush. Gains +1 attack when damaged.',
+    archetype: 'aggro',
+    keywords: [
+      {
+        type: 'rush'
+      },
+      {
+        type: 'enrage',
+        attackBonus: 1
+      }
+    ]
+  },
+  {
+    id: 'shadow-step-assassin',
+    name: 'Shadow Step Assassin',
+    school: 'Genjutsu',
+    cost: 5,
+    attack: 6,
+    health: 1,
+    rarity: 'rare',
+    ability: 'Stealth (5s). Dies if blocked.',
+    archetype: 'aggro',
+    keywords: [
+      {
+        type: 'stealth',
+        durationMs: 5000
+      },
+      {
+        type: 'fragile'
+      }
+    ]
+  },
+
+  // === ADDITIONAL CONTROL CARDS ===
+  {
+    id: 'sanctuary-guardian',
+    name: 'Sanctuary Guardian',
+    school: 'Taijutsu',
+    cost: 6,
+    attack: 1,
+    health: 9,
+    rarity: 'rare',
+    ability: 'Taunt. Heal 1 at end of turn.',
+    archetype: 'control',
+    keywords: [
+      {
+        type: 'taunt'
+      },
+      {
+        type: 'heal-self-end-turn',
+        value: 1
+      }
+    ]
+  },
+  {
+    id: 'purifying-wind',
+    name: 'Purifying Wind',
+    school: 'Ninjutsu',
+    cost: 3,
+    attack: 1,
+    health: 1,
+    rarity: 'uncommon',
+    ability: 'On play: Remove all debuffs from allies.',
+    archetype: 'control',
+    onPlay: {
+      type: 'cleanse-allies'
+    }
+  },
+
+  // === ADDITIONAL COMBO CARDS ===
+  {
+    id: 'chakra-amplifier',
+    name: 'Chakra Amplifier',
+    school: 'Ninjutsu',
+    cost: 2,
+    attack: 1,
+    health: 2,
+    rarity: 'common',
+    ability: 'When you gain chakra: Gain +1 extra.',
+    archetype: 'combo',
+    keywords: [
+      {
+        type: 'chakra-amplifier',
+        bonus: 1
+      }
+    ]
+  },
+  {
+    id: 'technique-savant',
+    name: 'Technique Savant',
+    school: 'Genjutsu',
+    cost: 4,
+    attack: 3,
+    health: 3,
+    rarity: 'rare',
+    ability: 'The first combo each turn costs 0.',
+    archetype: 'combo',
+    keywords: [
+      {
+        type: 'first-combo-free'
+      }
+    ]
+  },
+  {
+    id: 'grand-master',
+    name: 'Grand Master',
+    school: 'Taijutsu',
+    cost: 9,
+    attack: 7,
+    health: 7,
+    rarity: 'legendary',
+    ability: 'On play: Trigger all your combo effects twice.',
+    archetype: 'combo',
+    onPlay: {
+      type: 'double-combo-effects'
     }
   }
 ];
