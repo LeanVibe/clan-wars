@@ -9,3 +9,5 @@ export * from './combat-events';
 export * from './ranking';
 export * from './persistence';
 export * from './game-persistence-bridge';
+export * from './analytics';
+export * from './analytics-integration';
