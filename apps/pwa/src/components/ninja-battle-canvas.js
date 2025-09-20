@@ -1,5 +1,6 @@
 import { LitElement, css, html } from 'lit';
 import * as THREE from 'three';
+import { combatEvents } from '@clan-wars/game-core';
 
 export class NinjaBattleCanvas extends LitElement {
   static styles = css`
@@ -335,11 +336,59 @@ export class NinjaBattleCanvas extends LitElement {
       border-radius: var(--radius-pill);
       font-size: var(--font-size-xs);
     }
+
+    /* Damage Floaters */
+    .damage-floaters {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .damage-floater {
+      position: absolute;
+      font-weight: 700;
+      font-size: 18px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      animation: float-up 1.5s ease-out forwards;
+      pointer-events: none;
+    }
+
+    .damage-floater.damage {
+      color: #ef4444;
+    }
+
+    .damage-floater.heal {
+      color: #22c55e;
+    }
+
+    .damage-floater.shield {
+      color: #3b82f6;
+    }
+
+    @keyframes float-up {
+      0% {
+        opacity: 1;
+        transform: translateY(0px) scale(1);
+      }
+      20% {
+        opacity: 1;
+        transform: translateY(-20px) scale(1.2);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-80px) scale(0.8);
+      }
+    }
   `;
 
   static properties = {
     state: { attribute: false },
-    selectedLane: { type: String }
+    selectedLane: { type: String },
+    damageFloaters: { state: true }
   };
 
   #scene;
@@ -360,17 +409,22 @@ export class NinjaBattleCanvas extends LitElement {
   #nextUnitStates = null;
   #laneCombos = new Map();
   #lastComboStamp = null;
+  #combatEventUnsubscribe = null;
 
   constructor() {
     super();
     this.state = null;
     this.selectedLane = null;
+    this.damageFloaters = [];
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this.#resizeObserver) {
       this.#resizeObserver.disconnect();
+    }
+    if (this.#combatEventUnsubscribe) {
+      this.#combatEventUnsubscribe();
     }
   }
 
@@ -384,6 +438,7 @@ export class NinjaBattleCanvas extends LitElement {
     // Wait for layout to settle before initializing Three.js
     requestAnimationFrame(() => {
       this.#initializeThreeJS(canvas);
+      this.#setupCombatEventListener();
     });
   }
 
@@ -1048,6 +1103,41 @@ export class NinjaBattleCanvas extends LitElement {
     }
   }
 
+  #setupCombatEventListener() {
+    this.#combatEventUnsubscribe = combatEvents.subscribe((event) => {
+      if (event && (event.type === 'damage' || event.type === 'heal')) {
+        this.#createDamageFloater(event);
+      }
+    });
+  }
+
+  #createDamageFloater(event) {
+    const { type, data } = event;
+    const lane = data.lane;
+    const lanePositions = {
+      mountain: { x: 20, y: 20 },
+      forest: { x: 20, y: 120 },
+      river: { x: 20, y: 220 }
+    };
+    
+    const basePos = lanePositions[lane] || { x: 20, y: 120 };
+    const floater = {
+      id: Date.now() + Math.random(),
+      type: type,
+      value: type === 'damage' ? data.damage : data.amount,
+      x: basePos.x + Math.random() * 60 - 30, // Random offset
+      y: basePos.y + Math.random() * 20 - 10,
+      timestamp: Date.now()
+    };
+
+    this.damageFloaters = [...this.damageFloaters, floater];
+
+    // Remove floater after animation completes
+    setTimeout(() => {
+      this.damageFloaters = this.damageFloaters.filter(f => f.id !== floater.id);
+    }, 1500);
+  }
+
   #statusTime(status, now) {
     if (!status || typeof now !== 'number') return '';
     if (status.type === 'delayed-damage' && status.triggerAt) {
@@ -1256,6 +1346,16 @@ export class NinjaBattleCanvas extends LitElement {
               Exit Match
             </button>
           </div>
+        </div>
+        <div class="damage-floaters">
+          ${this.damageFloaters.map(floater => html`
+            <div 
+              class="damage-floater ${floater.type}" 
+              style="left: ${floater.x}px; top: ${floater.y}px;"
+            >
+              ${floater.type === 'damage' ? '-' : '+'}${floater.value}
+            </div>
+          `)}
         </div>
       </div>
     `;

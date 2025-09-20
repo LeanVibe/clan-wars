@@ -1,10 +1,11 @@
 import { LitElement, css, html } from 'lit';
-import { createInitialState, terrains, startMatch, applyTick, playCard, canPlayCard, drawCard, meditate, canMeditate, combatEvents } from '@clan-wars/game-core';
+import { createInitialState, terrains, startMatch, applyTick, playCard, canPlayCard, drawCard, meditate, canMeditate, combatEvents, playReactiveJutsu } from '@clan-wars/game-core';
 import './ninja-battle-canvas';
 import './ninja-hand';
 import './ninja-chakra-meter';
 import './ninja-combat-log';
 import './ninja-lane-composition';
+import './ninja-reactive-jutsu-window';
 import '@clan-wars/ui-components';
 
 export class NinjaClanWarsApp extends LitElement {
@@ -207,6 +208,18 @@ export class NinjaClanWarsApp extends LitElement {
     }
   }
 
+  #handleActivateJutsu(event) {
+    if (!this.game || this.game.phase !== 'battle') return;
+    const { windowId, jutsuId, timestamp } = event.detail;
+    const now = timestamp ?? currentTime();
+    
+    try {
+      this.game = playReactiveJutsu(this.game, { windowId, jutsuId, timestamp: now });
+    } catch (error) {
+      console.warn('Failed to activate reactive jutsu:', error);
+    }
+  }
+
   render() {
     return html`
       <div class="app-shell">
@@ -255,6 +268,7 @@ export class NinjaClanWarsApp extends LitElement {
             .current=${this.game.chakra.current}
             .max=${this.game.chakra.max}
             .overflow=${this.game.chakra.overflowMax}
+            .overheatPenalty=${this.game.chakra.overheatPenalty ?? 0}
           ></ninja-chakra-meter>
         </footer>
         
@@ -265,6 +279,13 @@ export class NinjaClanWarsApp extends LitElement {
           .gameState=${this.game}
           @close=${() => this.#handleCloseLaneComposition()}
         ></ninja-lane-composition>
+
+        <!-- Reactive Jutsu Window -->
+        <ninja-reactive-jutsu-window
+          .gameState=${this.game}
+          .currentTime=${currentTime()}
+          @activate-jutsu=${(event) => this.#handleActivateJutsu(event)}
+        ></ninja-reactive-jutsu-window>
       </div>
     `;
   }

@@ -99,9 +99,12 @@ export function createInitialState(now = currentTime()) {
       },
       comboWindows: 0,
       comboConversions: 0,
+      comboAttempts: 0,
       firstStructureHitAt: null,
       firstStructureDestroyedAt: null,
-      structureDamageEvents: []
+      structureDamageEvents: [],
+      cardDeadTimeTotal: 0,
+      cardsDrawn: 0
     },
     clock: {
       durationSeconds: MATCH_DURATION_SECONDS,

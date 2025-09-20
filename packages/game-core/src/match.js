@@ -7,7 +7,8 @@ import {
   MATCH_DURATION_SECONDS,
   STRUCTURE_DAMAGE_MULTIPLIER,
   STRUCTURE_ARMOR,
-  MEDITATE_COOLDOWN_MS
+  MEDITATE_COOLDOWN_MS,
+  currentTime
 } from './state.js';
 import { shuffle, createId, reshuffle } from './utils.js';
 import { effectEngine, EventTypes } from './effect-engine.js';
@@ -259,12 +260,21 @@ export function startMatch(baseState, timestamp) {
 export function applyTick(state, timestamp) {
   if (state.phase !== 'battle') return state;
   const chakraDelta = (timestamp - state.chakra.lastTick) / 1000;
+  const newChakraAmount = state.chakra.current + chakraDelta * CHAKRA_REGEN_PER_SECOND;
+  const overflowMax = state.chakra.overflowMax ?? OVERFLOW_CHAKRA;
+  const maxChakra = state.chakra.max ?? MAX_CHAKRA;
+  
   const regenerated = chakraDelta > 0
-    ? Math.min(
-        state.chakra.current + chakraDelta * CHAKRA_REGEN_PER_SECOND,
-        state.chakra.overflowMax ?? OVERFLOW_CHAKRA
-      )
+    ? Math.min(newChakraAmount, overflowMax)
     : state.chakra.current;
+
+  // Apply overheat penalty when at overflow cap
+  let overheatPenalty = state.chakra.overheatPenalty ?? 0;
+  if (regenerated >= overflowMax && regenerated > maxChakra) {
+    overheatPenalty = Math.min(overheatPenalty + 0.05, 1.0); // Gradual penalty buildup
+  } else if (regenerated <= maxChakra && overheatPenalty > 0) {
+    overheatPenalty = Math.max(overheatPenalty - 0.1, 0); // Penalty decays when below max
+  }
 
   let activeTerrain = state.activeTerrain;
   let nextTerrainAt = state.nextTerrainAt;
@@ -295,6 +305,7 @@ export function applyTick(state, timestamp) {
     chakra: {
       ...state.chakra,
       current: regenerated,
+      overheatPenalty,
       lastTick: timestamp
     },
     activeTerrain,
@@ -378,18 +389,24 @@ export function playCard(state, { cardId, lane, timestamp }) {
     player: [...battlefield[lane].player, unit]
   };
 
+  // Calculate card dead-time (time unplayable in hand)
+  const cardDeadTime = card.drawnAt ? (timestamp - card.drawnAt) / 1000 : 0;
+  const effectiveCost = getEffectiveCardCost(state, card);
+  const wasUnplayable = state.chakra.current < effectiveCost;
+  
   let nextState = {
     ...state,
     hand,
     discard: [...state.discard, card],
     chakra: {
       ...state.chakra,
-      current: Math.max(state.chakra.current - card.cost, 0)
+      current: Math.max(state.chakra.current - effectiveCost, 0)
     },
     battlefield,
     stats: {
       ...state.stats,
-      actions: state.stats.actions + 1
+      actions: state.stats.actions + 1,
+      cardDeadTimeTotal: (state.stats.cardDeadTimeTotal ?? 0) + (wasUnplayable ? cardDeadTime : 0)
     }
   };
 
@@ -417,11 +434,22 @@ export function drawCard(state) {
   }
   if (!deck.length) return state;
   const [next, ...rest] = deck;
+  
+  // Add telemetry tracking for card draw time
+  const cardWithTelemetry = {
+    ...next,
+    drawnAt: currentTime()
+  };
+  
   return {
     ...state,
     deck: rest,
     discard,
-    hand: [...state.hand, next]
+    hand: [...state.hand, cardWithTelemetry],
+    stats: {
+      ...state.stats,
+      cardsDrawn: (state.stats?.cardsDrawn ?? 0) + 1
+    }
   };
 }
 
@@ -1771,36 +1799,8 @@ function getAiSpawnDelay(state) {
   return baseDelay;
 }
 
-/**
- * Play a reactive jutsu during an active combo window
- */
-export function playReactiveJutsu(state, { windowId, jutsuId, timestamp }) {
-  if (state.phase !== 'battle') {
-    return { success: false, reason: 'not_in_battle' };
-  }
-
-  const result = playReactiveJutsuHelper(state, { windowId, jutsuId, timestamp });
-  
-  if (result.success) {
-    // Update stats
-    const nextStats = {
-      ...state.stats,
-      actions: state.stats.actions + 1,
-      comboWindows: state.stats.comboWindows + 1,
-      comboConversions: state.stats.comboConversions + 1
-    };
-
-    return {
-      ...result,
-      state: {
-        ...state,
-        stats: nextStats
-      }
-    };
-  }
-
-  return result;
-}
+// Note: playReactiveJutsu is exported from reactive-jutsu.js
+// This file provides other match-related functions
 
 /**
  * Get current reactive windows for UI display
