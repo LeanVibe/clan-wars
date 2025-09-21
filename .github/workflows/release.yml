@@ -1,0 +1,465 @@
+name: Release Management
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+      release_type:
+        description: 'Type of release'
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+          - prerelease
+        default: 'patch'
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: '1.1.12'
+  NODE_ENV: production
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Tag push
+            VERSION="${{ github.ref_name }}"
+            TAG="${{ github.ref_name }}"
+          else
+            # Manual workflow
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="${{ github.event.inputs.version }}"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          
+          # Check if prerelease
+          if [[ "$VERSION" =~ -[a-zA-Z] ]]; then
+            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-prerelease=${{ github.event.inputs.prerelease || 'false' }}" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Release version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3 or v1.2.3-alpha.1"
+            exit 1
+          fi
+          echo "✅ Version format valid: $VERSION"
+
+      - name: Run comprehensive tests
+        run: |
+          echo "Running comprehensive test suite for release..."
+          bun run test -- --run --coverage --reporter=verbose
+          
+      - name: Security audit
+        run: |
+          echo "Running security audit..."
+          bun audit --audit-level=moderate
+
+      - name: Build validation
+        run: |
+          echo "Validating release build..."
+          bun run build
+          
+          # Validate critical files
+          if [ ! -f "apps/pwa/dist/index.html" ]; then
+            echo "❌ Release build validation failed"
+            exit 1
+          fi
+          echo "✅ Release build validation passed"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "Generating changelog..."
+          
+          # Get previous tag
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ steps.version.outputs.tag }}" | head -n1)
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found, generating initial changelog"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to ${{ steps.version.outputs.tag }}"
+            COMMITS=$(git log $PREVIOUS_TAG..${{ github.sha }} --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Create changelog
+          CHANGELOG="## What's Changed\n\n$COMMITS"
+          
+          # Save to output (escape newlines)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build-release:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate-release]
+
+    outputs:
+      artifact-name: ${{ steps.upload.outputs.artifact-name }}
+      bundle-size: ${{ steps.analyze.outputs.bundle-size }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Configure release environment
+        run: |
+          echo "VITE_APP_VERSION=${{ needs.validate-release.outputs.version }}" >> apps/pwa/.env.production
+          echo "VITE_APP_RELEASE_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> apps/pwa/.env.production
+          echo "VITE_APP_COMMIT_SHA=${{ github.sha }}" >> apps/pwa/.env.production
+          echo "VITE_APP_ENVIRONMENT=production" >> apps/pwa/.env.production
+
+      - name: Build release
+        run: |
+          echo "Building release ${{ needs.validate-release.outputs.version }}..."
+          bun run build
+          
+          # Generate release manifest
+          echo "{
+            \"version\": \"${{ needs.validate-release.outputs.version }}\",
+            \"releaseDate\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"commitSha\": \"${{ github.sha }}\",
+            \"environment\": \"production\",
+            \"isPrerelease\": ${{ needs.validate-release.outputs.is-prerelease }}
+          }" > apps/pwa/dist/release-manifest.json
+
+      - name: Optimize release build
+        run: |
+          echo "Optimizing release build..."
+          
+          # Compress assets
+          find apps/pwa/dist -name "*.js" -o -name "*.css" -o -name "*.html" | xargs gzip -k
+          
+          # Generate file hashes for integrity
+          find apps/pwa/dist -type f -name "*.js" -o -name "*.css" | while read file; do
+            sha256sum "$file" >> apps/pwa/dist/checksums.sha256
+          done
+
+      - name: Analyze bundle
+        id: analyze
+        run: |
+          echo "=== Release Bundle Analysis ==="
+          BUNDLE_SIZE=$(du -sh apps/pwa/dist | cut -f1)
+          echo "Total bundle size: $BUNDLE_SIZE"
+          echo "bundle-size=$BUNDLE_SIZE" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "=== Asset Breakdown ==="
+          du -sh apps/pwa/dist/* | sort -hr
+          
+          echo ""
+          echo "=== Critical Files ==="
+          find apps/pwa/dist -name "*.js" -o -name "*.css" | xargs ls -lh
+
+      - name: Create release archive
+        run: |
+          cd apps/pwa
+          tar -czf "ninja-clan-wars-${{ needs.validate-release.outputs.version }}.tar.gz" dist/
+          zip -r "ninja-clan-wars-${{ needs.validate-release.outputs.version }}.zip" dist/
+
+      - name: Upload release artifacts
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ needs.validate-release.outputs.version }}
+          path: |
+            apps/pwa/dist/
+            apps/pwa/*.tar.gz
+            apps/pwa/*.zip
+          retention-days: 90
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate-release, build-release]
+    
+    outputs:
+      release-id: ${{ steps.release.outputs.id }}
+      release-url: ${{ steps.release.outputs.html_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-${{ needs.validate-release.outputs.version }}
+          path: ./release-assets
+
+      - name: Create GitHub Release
+        id: release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.validate-release.outputs.tag }}
+          release_name: "Ninja Clan Wars ${{ needs.validate-release.outputs.version }}"
+          body: |
+            # Ninja Clan Wars ${{ needs.validate-release.outputs.version }}
+            
+            ${{ needs.validate-release.outputs.changelog }}
+            
+            ## 📦 Release Assets
+            - **Bundle Size:** ${{ needs.build-release.outputs.bundle-size }}
+            - **Build Date:** $(date -u +%Y-%m-%d)
+            - **Commit:** ${{ github.sha }}
+            
+            ## 🚀 Deployment
+            This release will be automatically deployed to production upon approval.
+            
+            ## 📋 Installation
+            Download the appropriate archive for your deployment method:
+            - `ninja-clan-wars-${{ needs.validate-release.outputs.version }}.zip` - Standard deployment
+            - `ninja-clan-wars-${{ needs.validate-release.outputs.version }}.tar.gz` - Server deployment
+            
+            ## 🔒 Verification
+            Verify the integrity of downloaded files using the included `checksums.sha256` file.
+            
+            ---
+            
+            **Full Changelog:** https://github.com/${{ github.repository }}/compare/${{ needs.validate-release.outputs.previous-tag }}...${{ needs.validate-release.outputs.tag }}
+          draft: ${{ github.event.inputs.draft || 'false' }}
+          prerelease: ${{ needs.validate-release.outputs.is-prerelease }}
+
+      - name: Upload release archives
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./release-assets/ninja-clan-wars-${{ needs.validate-release.outputs.version }}.zip
+          asset_name: ninja-clan-wars-${{ needs.validate-release.outputs.version }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload tar.gz archive
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./release-assets/ninja-clan-wars-${{ needs.validate-release.outputs.version }}.tar.gz
+          asset_name: ninja-clan-wars-${{ needs.validate-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./release-assets/checksums.sha256
+          asset_name: checksums.sha256
+          asset_content_type: text/plain
+
+  auto-deploy-release:
+    name: Auto-deploy Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate-release, create-github-release]
+    if: ${{ !needs.validate-release.outputs.is-prerelease }}
+    environment:
+      name: production-release
+      url: https://ninja-clan-wars.vercel.app
+
+    steps:
+      - name: Trigger production deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              ref: '${{ needs.validate-release.outputs.tag }}',
+              inputs: {
+                environment: 'production'
+              }
+            });
+            
+            console.log('Triggered production deployment for release ${{ needs.validate-release.outputs.version }}');
+
+  post-release-tasks:
+    name: Post-release Tasks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate-release, create-github-release, auto-deploy-release]
+    if: always() && needs.create-github-release.result == 'success'
+
+    steps:
+      - name: Update project version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Could trigger version bump in package.json for next development cycle
+            console.log('Release ${{ needs.validate-release.outputs.version }} completed successfully');
+
+      - name: Notify team
+        uses: 8398a7/action-slack@v3
+        if: env.SLACK_WEBHOOK_URL != ''
+        with:
+          status: ${{ job.status }}
+          text: |
+            🎉 **NEW RELEASE PUBLISHED**
+            
+            **Version:** ${{ needs.validate-release.outputs.version }}
+            **Type:** ${{ needs.validate-release.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable Release' }}
+            **Bundle Size:** ${{ needs.build-release.outputs.bundle-size }}
+            **Release URL:** ${{ needs.create-github-release.outputs.release-url }}
+            
+            ${{ needs.validate-release.outputs.is-prerelease == 'false' && '🚀 Auto-deployment to production initiated' || '⚠️ Pre-release - manual deployment required' }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create next milestone
+        uses: actions/github-script@v7
+        if: ${{ !needs.validate-release.outputs.is-prerelease }}
+        with:
+          script: |
+            const version = '${{ needs.validate-release.outputs.version }}';
+            const versionMatch = version.match(/v(\d+)\.(\d+)\.(\d+)/);
+            
+            if (versionMatch) {
+              const [, major, minor, patch] = versionMatch;
+              const nextPatch = `v${major}.${minor}.${parseInt(patch) + 1}`;
+              
+              try {
+                await github.rest.issues.createMilestone({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: nextPatch,
+                  description: `Next patch release after ${version}`,
+                  state: 'open'
+                });
+                console.log(`Created milestone for ${nextPatch}`);
+              } catch (error) {
+                console.log('Milestone creation failed or already exists:', error.message);
+              }
+            }
+
+  rollback-plan:
+    name: Prepare Rollback Information
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate-release, create-github-release]
+    if: failure()
+
+    steps:
+      - name: Generate rollback information
+        run: |
+          echo "=== RELEASE FAILURE - ROLLBACK INFORMATION ==="
+          echo "Failed release version: ${{ needs.validate-release.outputs.version }}"
+          echo "Failed commit: ${{ github.sha }}"
+          echo "Previous stable release should be restored"
+          echo ""
+          echo "To rollback:"
+          echo "1. Check previous stable release in GitHub releases"
+          echo "2. Redeploy previous stable version"
+          echo "3. Monitor deployment health"
+          echo "4. Update incident documentation"
+
+      - name: Notify failure
+        uses: 8398a7/action-slack@v3
+        if: env.SLACK_WEBHOOK_URL != ''
+        with:
+          status: failure
+          text: |
+            🚨 **RELEASE FAILED**
+            
+            **Version:** ${{ needs.validate-release.outputs.version }}
+            **Commit:** ${{ github.sha }}
+            **Failure Stage:** Check workflow logs
+            
+            🔄 **Rollback Required** - Previous stable version should be restored
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

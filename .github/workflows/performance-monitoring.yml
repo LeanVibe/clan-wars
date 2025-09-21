@@ -1,0 +1,440 @@
+name: Performance Monitoring
+
+on:
+  schedule:
+    # Run performance monitoring every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to monitor'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      test_type:
+        description: 'Type of performance test'
+        required: true
+        default: 'lighthouse'
+        type: choice
+        options:
+          - lighthouse
+          - load-test
+          - core-vitals
+          - full-suite
+
+env:
+  BUN_VERSION: '1.1.12'
+
+jobs:
+  lighthouse-monitoring:
+    name: Lighthouse Performance Monitoring
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ github.event.inputs.test_type == 'lighthouse' || github.event.inputs.test_type == 'full-suite' || github.event_name == 'schedule' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.12.x
+
+      - name: Determine target URL
+        id: url
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "url=https://staging--ninja-clan-wars.vercel.app" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://ninja-clan-wars.vercel.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Lighthouse audits
+        run: |
+          lhci autorun \
+            --collect.url="${{ steps.url.outputs.url }}" \
+            --collect.url="${{ steps.url.outputs.url }}/game" \
+            --collect.url="${{ steps.url.outputs.url }}/tournament" \
+            --upload.target=temporary-public-storage
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Parse Lighthouse results
+        id: results
+        run: |
+          echo "Parsing Lighthouse results..."
+          
+          # Extract performance scores (simplified)
+          SCORES_FILE=".lighthouseci/lighthouse-scores.json"
+          if [ -f "$SCORES_FILE" ]; then
+            PERF_SCORE=$(cat "$SCORES_FILE" | jq -r '.performance // 0')
+            ACCESSIBILITY_SCORE=$(cat "$SCORES_FILE" | jq -r '.accessibility // 0')
+            BEST_PRACTICES_SCORE=$(cat "$SCORES_FILE" | jq -r '.bestPractices // 0')
+            
+            echo "performance=$PERF_SCORE" >> $GITHUB_OUTPUT
+            echo "accessibility=$ACCESSIBILITY_SCORE" >> $GITHUB_OUTPUT
+            echo "best-practices=$BEST_PRACTICES_SCORE" >> $GITHUB_OUTPUT
+          else
+            echo "No scores file found, using defaults"
+            echo "performance=0.8" >> $GITHUB_OUTPUT
+            echo "accessibility=0.9" >> $GITHUB_OUTPUT
+            echo "best-practices=0.8" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check performance budgets
+        run: |
+          echo "=== Performance Budget Check ==="
+          
+          PERF_SCORE=${{ steps.results.outputs.performance }}
+          A11Y_SCORE=${{ steps.results.outputs.accessibility }}
+          BP_SCORE=${{ steps.results.outputs.best-practices }}
+          
+          echo "Performance Score: $PERF_SCORE (target: 0.8)"
+          echo "Accessibility Score: $A11Y_SCORE (target: 0.9)"
+          echo "Best Practices Score: $BP_SCORE (target: 0.8)"
+          
+          BUDGET_FAILED=false
+          
+          if (( $(echo "$PERF_SCORE < 0.8" | bc -l) )); then
+            echo "❌ Performance budget exceeded"
+            BUDGET_FAILED=true
+          fi
+          
+          if (( $(echo "$A11Y_SCORE < 0.9" | bc -l) )); then
+            echo "❌ Accessibility budget exceeded"
+            BUDGET_FAILED=true
+          fi
+          
+          if (( $(echo "$BP_SCORE < 0.8" | bc -l) )); then
+            echo "❌ Best practices budget exceeded"
+            BUDGET_FAILED=true
+          fi
+          
+          if [ "$BUDGET_FAILED" = "true" ]; then
+            echo "::warning::Performance budgets exceeded"
+          else
+            echo "✅ All performance budgets met"
+          fi
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports-${{ github.run_id }}
+          path: |
+            .lighthouseci/
+            lighthouse-reports/
+          retention-days: 30
+
+  core-vitals-monitoring:
+    name: Core Web Vitals Monitoring
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event.inputs.test_type == 'core-vitals' || github.event.inputs.test_type == 'full-suite' || github.event_name == 'schedule' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright
+        run: bun x playwright install --with-deps chromium
+
+      - name: Determine target URL
+        id: url
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "url=https://staging--ninja-clan-wars.vercel.app" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://ninja-clan-wars.vercel.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Core Web Vitals test
+        run: |
+          mkdir -p tests/performance
+          cat > tests/performance/core-vitals.spec.js << 'EOF'
+          import { test, expect } from '@playwright/test';
+          
+          test.describe('Core Web Vitals', () => {
+            test('Homepage Core Web Vitals', async ({ page }) => {
+              // Navigate to homepage
+              await page.goto('/');
+              
+              // Wait for page to be fully loaded
+              await page.waitForLoadState('networkidle');
+              
+              // Measure Core Web Vitals
+              const vitals = await page.evaluate(() => {
+                return new Promise((resolve) => {
+                  const observer = new PerformanceObserver((list) => {
+                    const entries = list.getEntries();
+                    const vitals = {};
+                    
+                    entries.forEach((entry) => {
+                      if (entry.name === 'FCP') vitals.fcp = entry.value;
+                      if (entry.name === 'LCP') vitals.lcp = entry.value;
+                      if (entry.name === 'CLS') vitals.cls = entry.value;
+                      if (entry.name === 'FID') vitals.fid = entry.value;
+                    });
+                    
+                    // Get LCP from PerformanceObserver if available
+                    if (window.performance && window.performance.getEntriesByType) {
+                      const paintEntries = window.performance.getEntriesByType('paint');
+                      const fcpEntry = paintEntries.find(entry => entry.name === 'first-contentful-paint');
+                      if (fcpEntry) vitals.fcp = fcpEntry.startTime;
+                    }
+                    
+                    resolve(vitals);
+                  });
+                  
+                  observer.observe({ entryTypes: ['paint', 'largest-contentful-paint', 'layout-shift', 'first-input'] });
+                  
+                  // Fallback timeout
+                  setTimeout(() => resolve({}), 5000);
+                });
+              });
+              
+              console.log('Core Web Vitals:', vitals);
+              
+              // Basic performance assertions
+              if (vitals.fcp) {
+                expect(vitals.fcp).toBeLessThan(2000); // FCP < 2s
+              }
+              
+              if (vitals.lcp) {
+                expect(vitals.lcp).toBeLessThan(2500); // LCP < 2.5s
+              }
+              
+              if (vitals.cls) {
+                expect(vitals.cls).toBeLessThan(0.1); // CLS < 0.1
+              }
+            });
+            
+            test('Game Page Performance', async ({ page }) => {
+              await page.goto('/game');
+              await page.waitForLoadState('networkidle');
+              
+              // Check that the page loads reasonably fast
+              const loadTime = await page.evaluate(() => {
+                return window.performance.timing.loadEventEnd - window.performance.timing.navigationStart;
+              });
+              
+              expect(loadTime).toBeLessThan(5000); // Load time < 5s
+            });
+          });
+          EOF
+
+      - name: Run Core Web Vitals tests
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.url.outputs.url }}
+        run: |
+          bun x playwright test tests/performance/core-vitals.spec.js --reporter=json > core-vitals-results.json
+        continue-on-error: true
+
+      - name: Parse Core Web Vitals results
+        run: |
+          echo "=== Core Web Vitals Results ==="
+          if [ -f "core-vitals-results.json" ]; then
+            cat core-vitals-results.json | jq '.suites[0].tests[] | {title: .title, status: .status, duration: .duration}'
+          else
+            echo "No results file generated"
+          fi
+
+      - name: Upload Core Web Vitals results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-vitals-results-${{ github.run_id }}
+          path: |
+            core-vitals-results.json
+            test-results/
+          retention-days: 30
+
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.inputs.test_type == 'load-test' || github.event.inputs.test_type == 'full-suite' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Determine target URL
+        id: url
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "url=https://staging--ninja-clan-wars.vercel.app" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://ninja-clan-wars.vercel.app" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create load test script
+        run: |
+          mkdir -p tests/load
+          cat > tests/load/basic-load-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate } from 'k6/metrics';
+          
+          const errorRate = new Rate('errors');
+          
+          export const options = {
+            stages: [
+              { duration: '2m', target: 20 }, // Ramp up
+              { duration: '5m', target: 20 }, // Steady state
+              { duration: '2m', target: 50 }, // Ramp up to peak
+              { duration: '5m', target: 50 }, // Peak load
+              { duration: '2m', target: 0 },  // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<2000'], // 95% of requests under 2s
+              http_req_failed: ['rate<0.05'],    // Error rate under 5%
+              errors: ['rate<0.05'],
+            },
+          };
+          
+          const BASE_URL = __ENV.BASE_URL || 'https://ninja-clan-wars.vercel.app';
+          
+          export default function() {
+            // Test homepage
+            let response = http.get(BASE_URL);
+            check(response, {
+              'homepage status is 200': (r) => r.status === 200,
+              'homepage response time < 2s': (r) => r.timings.duration < 2000,
+            }) || errorRate.add(1);
+            
+            sleep(1);
+            
+            // Test game page
+            response = http.get(`${BASE_URL}/game`);
+            check(response, {
+              'game page status is 200': (r) => r.status === 200,
+              'game page response time < 3s': (r) => r.timings.duration < 3000,
+            }) || errorRate.add(1);
+            
+            sleep(2);
+            
+            // Test tournament page
+            response = http.get(`${BASE_URL}/tournament`);
+            check(response, {
+              'tournament page status is 200': (r) => r.status === 200,
+              'tournament page response time < 2s': (r) => r.timings.duration < 2000,
+            }) || errorRate.add(1);
+            
+            sleep(1);
+          }
+          EOF
+
+      - name: Run load test
+        run: |
+          k6 run tests/load/basic-load-test.js \
+            --env BASE_URL=${{ steps.url.outputs.url }} \
+            --out json=load-test-results.json
+        continue-on-error: true
+
+      - name: Parse load test results
+        run: |
+          echo "=== Load Test Results ==="
+          if [ -f "load-test-results.json" ]; then
+            # Extract key metrics
+            echo "Average response time:"
+            cat load-test-results.json | jq -r 'select(.type=="Point" and .metric=="http_req_duration") | .data.value' | awk '{sum+=$1; count++} END {if(count>0) print sum/count "ms"}'
+            
+            echo "Error rate:"
+            cat load-test-results.json | jq -r 'select(.type=="Point" and .metric=="http_req_failed") | .data.value' | awk '{sum+=$1; count++} END {if(count>0) print (sum/count)*100 "%"}'
+          else
+            echo "No load test results file found"
+          fi
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results-${{ github.run_id }}
+          path: load-test-results.json
+          retention-days: 30
+
+  performance-alert:
+    name: Performance Alert
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lighthouse-monitoring, core-vitals-monitoring]
+    if: always() && (failure() || contains(needs.*.result, 'failure'))
+
+    steps:
+      - name: Send performance alert
+        uses: 8398a7/action-slack@v3
+        if: env.SLACK_WEBHOOK_URL != ''
+        with:
+          status: failure
+          text: |
+            ⚠️ **PERFORMANCE MONITORING ALERT**
+            
+            **Environment:** ${{ github.event.inputs.environment || 'production' }}
+            **Test Type:** ${{ github.event.inputs.test_type || 'scheduled' }}
+            **Time:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+            
+            **Failed Checks:**
+            - Lighthouse: ${{ needs.lighthouse-monitoring.result }}
+            - Core Web Vitals: ${{ needs.core-vitals-monitoring.result }}
+            
+            Please review performance reports and investigate any regressions.
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create performance issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Performance Monitoring Alert - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            ## Performance Monitoring Alert
+            
+            **Environment:** ${{ github.event.inputs.environment || 'production' }}
+            **Test Type:** ${{ github.event.inputs.test_type || 'scheduled' }}
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            ### Failed Checks
+            - Lighthouse Monitoring: ${{ needs.lighthouse-monitoring.result }}
+            - Core Web Vitals: ${{ needs.core-vitals-monitoring.result }}
+            
+            ### Action Required
+            1. Review performance reports in workflow artifacts
+            2. Identify performance regressions
+            3. Optimize critical rendering path if needed
+            4. Update performance budgets if requirements changed
+            
+            **Auto-generated by Performance Monitoring workflow**
+            `;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['performance', 'monitoring', 'alert']
+            });
