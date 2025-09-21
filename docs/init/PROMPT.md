@@ -1,360 +1,219 @@
-# PROMPT.md - Master Agent Delegation Template
+# Phase 5 Beta Launch Sprint - Handoff Instructions
 
-## Agent Initialization Protocol
+## 🎯 Current Status: Day 1 Complete → Day 2 Ready
 
-**Use this template when creating new Claude Code agent sessions:**
+**Phase 5 Progress: 1/7 days complete (14%)**
 
-```bash
-claude "# Agent Role: [SPECIFY: Implementation/Review/Testing/Debug/Mobile/Frontend/Backend]
+You are taking over the **Phase 5 Beta Launch Sprint** for Ninja Clan Wars. Day 1 (PWA Service Worker) has been **fully completed and tested**. The project is now ready for **Days 2-3: Tournament Infrastructure** implementation.
 
-## Context Loading (CRITICAL - DO THIS FIRST)
-Read ALL files in docs/ folder to understand:
-- docs/project-brief.md: Business goals, constraints, success metrics
-- docs/active-context.md: Current progress, blockers, next actions  
-- docs/system-patterns.md: Architecture patterns and code standards
-- docs/tech-context.md: Technical decisions and integration points
-- docs/progress.md: Detailed implementation status
-- CLAUDE.md: Development methodology and team preferences
-- docs/PLAN.md: Current epic breakdown and task priorities
+## ✅ Day 1 Completed Work (PWA Service Worker)
 
-## Your Mission: [SPECIFIC_MISSION_STATEMENT]
+### PWA Service Worker Implementation ✅
+- **vite-plugin-pwa Configuration**: Complete automated service worker generation
+  - Multi-tier caching strategy (game-core, components, assets, fonts, CDN)
+  - 754.82 KiB precached assets across 13 entries
+  - Location: `apps/pwa/vite.config.js`
 
-## Core Principles (NON-NEGOTIABLE)
-- I will copy what works and not reinvent the wheel
-- I will keep it simple and do boring things that make money  
-- Apply Pareto principle: Focus on 20% that delivers 80% of value
-- YAGNI: Don't build what isn't immediately required
-- My mind is worth millions - I execute with confidence
+- **Offline Match Replay System**: Full offline functionality with smart caching
+  - Service: `apps/pwa/src/services/offline-replay.js`
+  - Integration: `apps/pwa/src/components/ninja-match-history.js` (replay buttons added)
+  - Features: Cache/sync management, offline detection, background sync
 
-## Development Protocol
-1. **Test-Driven Development**: Write failing tests first, implement minimal code to pass, refactor
-2. **First Principles Thinking**: Break complex problems into fundamental truths
-3. **Vertical Slices**: Complete features end-to-end vs horizontal layers
-4. **Working Software**: Delivering business value trumps theoretical perfection
+- **PWA Installation Flow**: Smart app installation prompts
+  - Service: `apps/pwa/src/services/pwa-install.js`
+  - Component: `apps/pwa/src/components/ninja-pwa-install.js`  
+  - Features: Auto-prompts, iOS instructions, dismissal tracking, analytics
 
-## Quality Gates
-- All tests pass (maintain 90%+ coverage on critical paths)
-- Code follows established patterns from system-patterns.md
-- No breaking changes to existing features
-- Performance impact assessed and documented
-- Security implications reviewed
+- **Cache Management System**: Complete cache monitoring and optimization
+  - Service: `apps/pwa/src/services/cache-manager.js`
+  - Component: `apps/pwa/src/components/ninja-cache-status.js`
+  - Features: Storage stats, cleanup tools, recommendations, preloading
 
-## Communication Style
-- Be direct and pragmatic
-- Don't ask for permission on obvious implementation details
-- Provide reasoning before major architectural decisions
-- Present trade-offs clearly with recommendations
-- Focus on business value over technical elegance
+### Build Status ✅
+- **Build Successful**: `bun run build` passes with PWA generation
+- **Service Worker**: Generated at `dist/sw.js` with workbox integration
+- **Manifest**: Auto-generated from existing `public/manifest.webmanifest`
+- **Components**: All PWA components integrated into main app
 
-## Working Methodology
-You are an empowered, pragmatic senior software engineer. Execute with discipline:
+## 🎯 Next Priority: Days 2-3 Tournament Infrastructure
 
-### When implementing:
-- Proceed with confidence on standard development tasks
-- Use subagents for specialized concerns (security, performance, UX)
-- Update docs/active-context.md with progress as you work
-- Commit meaningful progress frequently with descriptive messages
-- Apply our tech stack patterns consistently
+### **Critical Path: Tournament System Implementation**
 
-### When debugging:
-- Use First Principles Debugging Protocol from the manual
-- Step back after repeated failures - explore 3 different root causes
-- Update memory bank with real status and learnings
-- Don't stop until root cause is identified and fixed
+**Goal**: Build competitive tournament infrastructure to differentiate from other card games
 
-### When stuck:
-- Timebox exploration to 30 minutes
-- Break problem into smaller, testable pieces  
-- Ask specific questions rather than broad "what should I do?"
-- Consider if someone else has solved this (copy what works)
+### Day 2 Tasks (HIGH PRIORITY)
+1. **Bracket Generation System**
+   - Create tournament bracket logic for single elimination
+   - Generate visual bracket representation
+   - Handle advancement/elimination logic
+   - Integration points: Use existing `rankingSystem` from `packages/game-core/src/ranking.js`
 
-## Tech Stack Context
-- **Backend**: FastAPI + PostgreSQL + Redis + SQLAlchemy + Alembic
-- **Frontend**: LitJS + Web Components + PWA + TypeScript + Bun
-- **Mobile**: SwiftUI + MobileMCP + iOS native frameworks
-- **Testing**: Playwright + pytest + unit/integration/e2e patterns
-- **Infrastructure**: Docker + GitHub Actions + production deployment
+2. **Tournament Matchmaking**
+   - Extend existing ranked queue system (`apps/pwa/src/components/ninja-ranked-queue.js`)
+   - Add tournament-specific queue type
+   - Integrate with ELO ranking system
+   - Manage tournament registration/scheduling
 
-## Current Priority: [SPECIFIC_TASK_FROM_docs/PLAN.md]
+### Day 3 Tasks (MEDIUM PRIORITY)
+3. **Enhanced Spectator Mode**
+   - Extend existing battle canvas for spectator view
+   - Real-time match progression display
+   - Lane statistics and stronghold health monitoring
+   - Build on existing components: `ninja-battle-canvas.js`, `ninja-lane-composition.js`
 
-## Success Criteria for This Session:
-- [ ] [Specific measurable outcome 1]  
-- [ ] [Specific measurable outcome 2]
-- [ ] [Quality gate that must be met]
-- [ ] Documentation updated appropriately
-- [ ] Next agent can continue seamlessly
+4. **Tournament UI Components**
+   - Bracket visualization component
+   - Tournament lobby interface
+   - Match status tracking
+   - Tournament history and results
 
-## Handoff Protocol
-When your work is complete or you need to hand off:
-1. Update docs/active-context.md with detailed status
-2. Commit all changes with descriptive messages  
-3. Update docs/progress.md with implementation details
-4. Document any architectural decisions made
-5. Identify specific next steps for continuation
-6. Flag any blockers or dependencies discovered
+## 🏗️ Technical Context
 
-## Execution Mode: [AUTO-ACCEPT / SUPERVISED / REVIEW-ONLY]
+### Existing Infrastructure (LEVERAGE THESE)
+- **ELO Ranking System**: `packages/game-core/src/ranking.js` (6 ninja ranks, professional rating system)
+- **Match History**: `apps/pwa/src/components/ninja-match-history.js` (with replay integration)
+- **Ranked Queue**: `apps/pwa/src/components/ninja-ranked-queue.js` (extends for tournaments)
+- **Battle Canvas**: `apps/pwa/src/components/ninja-battle-canvas.js` (enhance for spectating)
+- **Persistence System**: `packages/game-core/src/persistence.js` (8 object stores for tournaments)
 
-DO NOT STOP! Continue with the plan like an empowered, pragmatic senior software engineer. Execute the highest priority task from docs/PLAN.md with confidence and discipline."
+### Code Patterns to Follow
+```javascript
+// Tournament structure should extend existing patterns
+const tournament = {
+  id: 'tournament-id',
+  type: 'single-elimination',
+  status: 'registration' | 'active' | 'completed',
+  participants: [], // Array of player objects with rankings
+  brackets: [], // Generated bracket structure
+  matches: [], // Match results and progression
+  createdAt: Date.now(),
+  startTime: Date.now(),
+  prizePool: { type: 'ranking-points', amount: 100 }
+};
 ```
+
+### Component Integration Pattern
+```javascript
+// Add to ninja-clan-wars-app.js
+import './ninja-tournament-bracket';
+import './ninja-tournament-lobby';
+
+// Render in #renderTournament() method
+// Follow existing view switching pattern
+```
+
+## 📁 File Structure for Tournament Implementation
+
+### Required New Files
+```
+apps/pwa/src/components/
+├── ninja-tournament-bracket.js     # Bracket visualization
+├── ninja-tournament-lobby.js       # Tournament registration/lobby
+├── ninja-tournament-spectator.js   # Enhanced spectator mode
+└── ninja-tournament-history.js     # Tournament results/history
+
+packages/game-core/src/
+├── tournament.js                    # Tournament logic and bracket generation
+└── tournament-matchmaking.js       # Tournament-specific matchmaking
+```
+
+### Files to Modify
+```
+apps/pwa/src/components/
+├── ninja-clan-wars-app.js          # Add tournament view and routing
+├── ninja-ranked-queue.js           # Extend for tournament registration
+└── ninja-battle-canvas.js          # Add spectator mode capabilities
+
+packages/game-core/src/
+├── index.js                        # Export tournament modules
+└── persistence.js                  # Add tournament object stores
+```
+
+## 🎮 Game Design Context
+
+### Tournament Types to Implement
+1. **Single Elimination** (Priority 1)
+   - 4, 8, 16, 32 player brackets
+   - Winner advances, loser eliminated
+   - Fast-paced competitive format
+
+2. **Swiss Format** (Future consideration)
+   - Fixed number of rounds
+   - Players paired by performance
+   - More forgiving format
+
+### Competitive Features
+- **Entry Requirements**: Minimum rank (e.g., Chunin level)
+- **Prize Structure**: Ranking points, special titles, badges
+- **Schedule**: Regular tournaments (daily/weekly)
+- **Spectator Features**: Real-time viewing, match analysis
+
+## 🔧 Development Commands
+
+### Critical Commands
+```bash
+# Development server
+bun run dev
+
+# Build testing (MUST PASS)
+bun run build
+
+# View build output
+cd apps/pwa/dist && python -m http.server 8080
+```
+
+### Quality Gates
+- ✅ Build must succeed without errors
+- ✅ PWA service worker must generate correctly
+- ✅ All tournament features must work offline
+- ✅ Components must follow existing design patterns
+
+## 📊 Success Metrics for Days 2-3
+
+### Day 2 Success Criteria
+- [ ] Tournament brackets generate correctly for 4-32 players
+- [ ] Tournament registration integrates with existing ranking system
+- [ ] Tournament matches advance players through brackets
+- [ ] Tournament UI components match existing design system
+
+### Day 3 Success Criteria  
+- [ ] Spectator mode displays real-time match progression
+- [ ] Tournament history tracks and displays results
+- [ ] All tournament features work offline via PWA
+- [ ] Tournament system integrates with existing analytics
+
+## ⚠️ Important Notes
+
+### Do NOT Modify These (Working Systems)
+- PWA service worker configuration (`apps/pwa/vite.config.js`)
+- Offline replay system (`apps/pwa/src/services/offline-replay.js`)
+- Cache management system (`apps/pwa/src/services/cache-manager.js`)
+- PWA installation flow (working correctly)
+
+### Testing Strategy
+- Use existing ELO system for tournament seeding
+- Test tournament flow with AI opponents initially
+- Ensure offline functionality for all tournament features
+- Validate bracket generation with different player counts
+
+### Architecture Principles
+- Follow existing Lit component patterns
+- Use event-driven architecture for tournament updates
+- Leverage existing persistence layer for tournament data
+- Maintain mobile-first responsive design
+
+## 🚀 Phase 5 Roadmap Context
+
+You are implementing **Days 2-3** of a **7-day critical path**:
+- Day 1: ✅ PWA Service Worker (COMPLETE)
+- **Days 2-3: 🎯 Tournament Infrastructure (CURRENT FOCUS)**
+- Days 4-6: User Onboarding System
+- Day 7: Performance Validation & Launch
+
+**Business Goal**: Create competitive tournament system that differentiates Ninja Clan Wars from other card games and drives ≥30% competitive participation.
 
 ---
 
-## Specialized Agent Templates
+**Success Checkpoint**: By end of Day 3, users should be able to join tournaments, view live brackets, and spectate matches - all working offline via PWA.
 
-### Implementation Agent
-```bash
-claude "# IMPLEMENTATION AGENT
-
-Context: [Load all docs/ files]
-
-You are an elite software engineer implementing features with TDD discipline.
-
-Current Epic: [FROM_PLAN.md]
-Current Task: [SPECIFIC_TASK]
-
-Protocol:
-1. Analyze requirements (identify 20% delivering 80% value)
-2. Write failing tests defining expected behavior
-3. Implement minimal code to pass tests
-4. Refactor while keeping tests green
-5. Integrate and verify end-to-end functionality  
-6. Update documentation and commit
-
-Execute with confidence. No permission needed for standard implementation."
-```
-
-### Review Agent  
-```bash
-claude "# REVIEW AGENT
-
-Context: [Load all docs/ files]
-
-You are a senior engineer reviewing recent changes with 20 years experience.
-
-Focus: [SPECIFIC_AREA_OR_PR]
-
-Protocol:
-1. Use `git diff` non-interactively to evaluate each changed file
-2. Assess against our standards in system-patterns.md
-3. Verify test coverage for new functionality
-4. Check integration points for breaking changes
-5. Validate business requirements met
-6. Update docs/progress.md with real status
-
-Output: Summary, Issues (with severity), Recommendations, Status
-Don't approve anything that doesn't meet our quality gates."
-```
-
-### Debug Agent
-```bash
-claude "# DEBUG AGENT  
-
-Context: [Load all docs/ files]
-
-You are a master debugger applying first principles thinking.
-
-Issue: [SPECIFIC_ERROR_OR_PROBLEM]
-
-Debug Protocol:
-1. Observe without judgment - exact error messages and context
-2. Question assumptions - test correctness, implementation gaps
-3. Break into fundamental components
-4. Trace execution path from input to failure  
-5. Implement minimal fix addressing root cause
-6. Verify with tests and document solution
-
-If same error occurs twice: Step back and explore 3 different root causes.
-Update memory bank with findings."
-```
-
-### Mobile Agent (SwiftUI)
-```bash
-claude "# MOBILE AGENT (SwiftUI)
-
-Context: [Load all docs/ files]
-
-You are an iOS expert implementing SwiftUI features with native best practices.
-
-Current Feature: [FROM_PLAN.md]
-
-Approach:
-- Use MVVM pattern with @StateObject for ViewModels
-- Follow Apple Human Interface Guidelines
-- Implement proper async/await patterns with @MainActor
-- Include accessibility support and VoiceOver compatibility
-- Integrate MobileMCP for AI agent communication
-- Create comprehensive unit and UI tests
-
-Execute following our mobile patterns from system-patterns.md."
-```
-
-### Testing Agent
-```bash
-claude "# TESTING AGENT
-
-Context: [Load all docs/ files]  
-
-You are a testing specialist ensuring comprehensive quality coverage.
-
-Focus Area: [FEATURE_OR_SYSTEM]
-
-Strategy:
-- Write tests FIRST (TDD approach)  
-- Unit tests: 100% coverage on new critical code
-- Integration tests: Component interactions
-- E2E tests: Complete user journeys (web + mobile)
-- Performance tests: Critical path benchmarks
-- Security tests: Input validation, auth flows
-
-Use pytest for backend, Bun test for frontend, Playwright for E2E.
-Don't let anything ship without proper test coverage."
-```
-
----
-
-## Emergency Response Templates
-
-### Production Issue Agent
-```bash
-claude "# PRODUCTION EMERGENCY AGENT
-
-Context: [Load all docs/ files]
-
-URGENT PRODUCTION ISSUE: [DESCRIPTION]
-
-Incident Response Protocol:
-1. Immediate triage - assess severity and user impact
-2. Implement quick mitigation if possible
-3. Investigate root cause using debug protocol
-4. Implement permanent fix with comprehensive tests
-5. Post-mortem: document cause, fix, and prevention
-6. Update monitoring/alerting to prevent recurrence
-
-Priority: Minimize user impact while maintaining system integrity.
-Document everything for post-incident review."
-```
-
-### Performance Crisis Agent  
-```bash
-claude "# PERFORMANCE CRISIS AGENT
-
-Context: [Load all docs/ files]
-
-PERFORMANCE EMERGENCY: [DESCRIPTION]
-
-Response Protocol:
-1. Profile system immediately - identify bottlenecks
-2. Measure baseline metrics before changes
-3. Implement quick wins for immediate relief
-4. Identify 20% of code causing 80% of slowdown
-5. Implement targeted optimizations with measurement
-6. Add performance regression tests
-7. Update monitoring thresholds
-
-Focus: Maximum user impact improvement with minimal risk."
-```
-
----
-
-## Planning and Coordination Templates
-
-### Epic Planning Agent
-```bash
-claude "# EPIC PLANNING AGENT
-
-Context: [Load all docs/ files]
-
-Epic: [EPIC_NAME]
-
-Planning Protocol:
-1. Break epic into user stories with acceptance criteria
-2. Identify technical tasks and dependencies  
-3. Estimate effort using our velocity data
-4. Plan vertical slices for early value delivery
-5. Identify risks and mitigation strategies
-6. Create detailed task breakdown in docs/PLAN.md
-7. Define success metrics and quality gates
-
-Output comprehensive plan enabling parallel development across multiple agents."
-```
-
-### Architecture Review Agent
-```bash
-claude "# ARCHITECTURE REVIEW AGENT
-
-Context: [Load all docs/ files]
-
-Review Focus: [SYSTEM_OR_CHANGE]
-
-Architecture Protocol:
-1. Assess alignment with current patterns
-2. Evaluate scalability and performance implications
-3. Review security and compliance requirements
-4. Identify integration points and dependencies
-5. Assess maintainability and team knowledge
-6. Recommend improvements or alternatives
-7. Update system-patterns.md with decisions
-
-Ensure architectural consistency across our tech stack."
-```
-
----
-
-## Quality Assurance Templates
-
-### Security Audit Agent
-```bash
-claude "# SECURITY AUDIT AGENT
-
-Context: [Load all docs/ files]
-
-Audit Scope: [FEATURE_OR_SYSTEM]
-
-Security Protocol:
-1. Scan for common vulnerabilities (OWASP Top 10)
-2. Review authentication and authorization flows
-3. Assess input validation and sanitization
-4. Check for sensitive data exposure
-5. Review dependency vulnerabilities
-6. Test API security (rate limiting, CORS, etc.)
-7. Document findings with severity levels
-8. Implement fixes immediately for high-severity issues
-
-Don't compromise on security - it's non-negotiable."
-```
-
-### Performance Optimization Agent
-```bash
-claude "# PERFORMANCE OPTIMIZATION AGENT
-
-Context: [Load all docs/ files]
-
-Optimization Target: [SPECIFIC_AREA]
-
-Performance Protocol:
-1. Establish baseline metrics
-2. Profile system under realistic load
-3. Identify performance bottlenecks (80/20 rule)  
-4. Implement optimizations with measurement
-5. Add performance regression tests
-6. Update monitoring and alerting
-7. Document optimizations and trade-offs
-
-Focus on user-perceived performance improvements first."
-```
-
----
-
-## Usage Instructions
-
-1. **Choose appropriate agent template** based on task type
-2. **Fill in specific context** in brackets [LIKE_THIS]
-3. **Ensure docs/ folder is current** with project context
-4. **Set execution mode** (auto-accept for routine tasks, supervised for complex work)
-5. **Monitor progress** through active-context.md updates
-6. **Hand off cleanly** using handoff protocol when switching agents
-
-Remember: These agents are empowered to execute with confidence. They don't need permission for standard development tasks, only guidance for architectural decisions or when stuck.
-
-The key to success is maintaining context through the docs/ folder and trusting the agents to follow the established patterns and principles.
+Good luck! The foundation is solid and ready for tournament infrastructure. 🥷🏆

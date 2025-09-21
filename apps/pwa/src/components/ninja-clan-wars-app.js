@@ -8,6 +8,8 @@ import './ninja-lane-composition';
 import './ninja-reactive-jutsu-window';
 import './ninja-ranked-queue';
 import './ninja-match-history';
+import './ninja-pwa-install';
+import './ninja-cache-status';
 import '@clan-wars/ui-components';
 
 export class NinjaClanWarsApp extends LitElement {
@@ -421,6 +423,10 @@ export class NinjaClanWarsApp extends LitElement {
             </button>
           ` : ''}
         </header>
+        
+        <!-- PWA Installation Prompt -->
+        <ninja-pwa-install></ninja-pwa-install>
+        
         <main>
           ${this.currentView === 'menu' ? this.#renderMenu() : ''}
           ${this.currentView === 'practice' ? this.#renderGame() : ''}
@@ -496,6 +502,9 @@ export class NinjaClanWarsApp extends LitElement {
             <p>Review your past battles, analyze your performance, and track your progression.</p>
           </div>
         </div>
+        
+        <!-- System Status -->
+        <ninja-cache-status></ninja-cache-status>
       </section>
     `;
   }

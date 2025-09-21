@@ -5,6 +5,8 @@
 
 import { LitElement, html, css } from 'lit';
 import { RANKS, rankingSystem } from '../../../../packages/game-core/src/ranking.js';
+import { createReplaySystem } from '../../../../packages/game-core/src/replay.js';
+import offlineReplayService from '../services/offline-replay.js';
 
 export class NinjaMatchHistory extends LitElement {
   static properties = {
@@ -12,7 +14,11 @@ export class NinjaMatchHistory extends LitElement {
     matchHistory: { type: Array },
     playerRating: { type: Object },
     showDetails: { type: Boolean },
-    selectedMatch: { type: Object }
+    selectedMatch: { type: Object },
+    replaysAvailable: { type: Map },
+    isOffline: { type: Boolean },
+    loadingReplays: { type: Set },
+    replayStats: { type: Object }
   };
 
   static styles = css`
@@ -290,6 +296,101 @@ export class NinjaMatchHistory extends LitElement {
       border-color: #10b981;
     }
 
+    .replay-button {
+      background: linear-gradient(45deg, #8b5cf6, #a855f7);
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-left: 8px;
+      opacity: 0.9;
+    }
+
+    .replay-button:hover {
+      opacity: 1;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+
+    .replay-button:disabled {
+      background: rgba(107, 114, 128, 0.5);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .replay-button.offline {
+      background: linear-gradient(45deg, #059669, #10b981);
+    }
+
+    .replay-button.loading {
+      background: rgba(245, 158, 11, 0.8);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { opacity: 0.8; }
+    }
+
+    .offline-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .online-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .replay-stats {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 0.75rem;
+      opacity: 0.8;
+    }
+
+    .replay-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 8px;
+      text-align: center;
+    }
+
+    .replay-stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .replay-stat-value {
+      font-weight: 600;
+      color: #8b5cf6;
+    }
+
     @media (max-width: 768px) {
       .stats-summary {
         grid-template-columns: repeat(2, 1fr);
@@ -299,6 +400,12 @@ export class NinjaMatchHistory extends LitElement {
         flex-direction: column;
         align-items: flex-start;
         gap: 4px;
+      }
+
+      .replay-button {
+        margin-left: 0;
+        margin-top: 8px;
+        width: 100%;
       }
     }
   `;
@@ -311,11 +418,18 @@ export class NinjaMatchHistory extends LitElement {
     this.showDetails = false;
     this.selectedMatch = null;
     this.filterType = 'all'; // all, wins, losses, ranked, casual
+    this.replaysAvailable = new Map();
+    this.isOffline = !navigator.onLine;
+    this.loadingReplays = new Set();
+    this.replayStats = { replays: 0, cached: 0, synced: 0 };
+    this.replaySystem = createReplaySystem();
   }
 
   connectedCallback() {
     super.connectedCallback();
     this.loadMatchHistory();
+    this.initializeReplaySystem();
+    this.setupNetworkListeners();
   }
 
   loadMatchHistory() {
@@ -378,6 +492,141 @@ export class NinjaMatchHistory extends LitElement {
     return (this.playerRating.wins / (this.playerRating.wins + this.playerRating.losses) * 100);
   }
 
+  async initializeReplaySystem() {
+    try {
+      // Load replay statistics
+      this.replayStats = await offlineReplayService.getCacheStats();
+      
+      // Check which matches have replays available
+      for (const match of this.matchHistory) {
+        if (match.replayId) {
+          const cachedReplay = await offlineReplayService.getCachedReplay(match.replayId);
+          this.replaysAvailable.set(match.id, !!cachedReplay);
+        }
+      }
+      
+      this.requestUpdate();
+    } catch (error) {
+      console.error('[MatchHistory] Failed to initialize replay system:', error);
+    }
+  }
+
+  setupNetworkListeners() {
+    window.addEventListener('online', () => {
+      this.isOffline = false;
+      this.requestUpdate();
+    });
+
+    window.addEventListener('offline', () => {
+      this.isOffline = true;
+      this.requestUpdate();
+    });
+  }
+
+  async watchReplay(match) {
+    if (!match.replayId) {
+      console.warn('[MatchHistory] No replay available for match:', match.id);
+      return;
+    }
+
+    this.loadingReplays.add(match.id);
+    this.requestUpdate();
+
+    try {
+      let replayData;
+      
+      // Try to get cached replay first (works offline)
+      const cachedReplay = await offlineReplayService.getCachedReplay(match.replayId);
+      
+      if (cachedReplay) {
+        replayData = cachedReplay.data;
+        console.log('[MatchHistory] Loaded replay from cache (offline mode)');
+      } else if (this.isOffline) {
+        throw new Error('Replay not available offline. Please connect to the internet to download it first.');
+      } else {
+        // If online and not cached, try to load from main persistence system
+        const { GamePersistenceBridge } = await import('@clan-wars/game-core');
+        const bridge = new GamePersistenceBridge();
+        const replay = await bridge.getReplay(match.replayId);
+        
+        if (replay) {
+          replayData = replay.data;
+          
+          // Cache the replay for offline use
+          await offlineReplayService.cacheReplay({
+            replayId: match.replayId,
+            matchId: match.id,
+            playerId: this.playerId,
+            data: replayData,
+            metadata: replay.metadata
+          });
+          
+          this.replaysAvailable.set(match.id, true);
+          console.log('[MatchHistory] Loaded replay from server and cached');
+        } else {
+          throw new Error('Replay not found on server');
+        }
+      }
+
+      // Load replay into replay system
+      this.replaySystem.importReplay({
+        metadata: { matchId: match.id, playerId: this.playerId },
+        events: replayData
+      });
+
+      // Emit event for replay viewer component to handle
+      this.dispatchEvent(new CustomEvent('replay-loaded', {
+        detail: { 
+          match, 
+          replaySystem: this.replaySystem,
+          isOffline: this.isOffline
+        },
+        bubbles: true
+      }));
+
+    } catch (error) {
+      console.error('[MatchHistory] Failed to load replay:', error);
+      
+      // Show user-friendly error
+      this.dispatchEvent(new CustomEvent('replay-error', {
+        detail: { 
+          match, 
+          error: error.message,
+          isOffline: this.isOffline
+        },
+        bubbles: true
+      }));
+    } finally {
+      this.loadingReplays.delete(match.id);
+      this.requestUpdate();
+    }
+  }
+
+  isReplayAvailable(match) {
+    return match.replayId && this.replaysAvailable.get(match.id);
+  }
+
+  isReplayLoading(match) {
+    return this.loadingReplays.has(match.id);
+  }
+
+  getReplayButtonText(match) {
+    if (this.isReplayLoading(match)) {
+      return 'Loading...';
+    }
+    
+    if (this.isOffline) {
+      return this.isReplayAvailable(match) ? '📺 Watch Offline' : '❌ Not Cached';
+    }
+    
+    return this.isReplayAvailable(match) ? '📺 Watch Replay' : '⬇ Download Replay';
+  }
+
+  shouldShowReplayButton(match) {
+    // Show button if replay exists and either we're online or it's cached
+    return match.replayId && (!this.isOffline || this.isReplayAvailable(match));
+  }
+
   render() {
     if (!this.playerRating) {
       return html`<div>Loading match history...</div>`;
@@ -388,7 +637,35 @@ export class NinjaMatchHistory extends LitElement {
     return html`
       <div class="history-header">
         <h2 class="history-title">Match History</h2>
+        ${this.isOffline ? html`
+          <span class="offline-indicator">
+            📡 Offline Mode
+          </span>
+        ` : html`
+          <span class="online-indicator">
+            🌐 Online
+          </span>
+        `}
       </div>
+
+      ${this.replayStats.replays > 0 ? html`
+        <div class="replay-stats">
+          <div class="replay-stats-grid">
+            <div class="replay-stat-item">
+              <div class="replay-stat-value">${this.replayStats.cached}</div>
+              <div>Cached</div>
+            </div>
+            <div class="replay-stat-item">
+              <div class="replay-stat-value">${this.replayStats.synced}</div>
+              <div>Synced</div>
+            </div>
+            <div class="replay-stat-item">
+              <div class="replay-stat-value">${this.replayStats.pending}</div>
+              <div>Pending</div>
+            </div>
+          </div>
+        </div>
+      ` : ''}
 
       <div class="stats-summary">
         <div class="stat-card">
@@ -481,6 +758,18 @@ export class NinjaMatchHistory extends LitElement {
             <span class="rating-change-badge ${ratingChange >= 0 ? 'rating-gain' : 'rating-loss'}">
               ${ratingChange >= 0 ? '+' : ''}${ratingChange}
             </span>
+            ${this.shouldShowReplayButton(match) ? html`
+              <button 
+                class="replay-button ${this.isOffline ? 'offline' : ''} ${this.isReplayLoading(match) ? 'loading' : ''}"
+                @click=${(e) => {
+                  e.stopPropagation();
+                  this.watchReplay(match);
+                }}
+                ?disabled=${this.isReplayLoading(match) || (this.isOffline && !this.isReplayAvailable(match))}
+              >
+                ${this.getReplayButtonText(match)}
+              </button>
+            ` : ''}
           </div>
         </div>
       </div>
